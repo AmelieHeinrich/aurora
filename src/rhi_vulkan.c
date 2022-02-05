@@ -32,6 +32,9 @@ struct vk_state
     VkDevice device;
     VkQueue graphics_queue;
     VkQueue compute_queue;
+    VkCommandPool graphics_pool;
+    VkCommandPool compute_pool;
+    VkCommandPool upload_pool;
     char* device_extensions[64];
     i32 device_extension_count;
 
@@ -299,6 +302,18 @@ void rhi_make_device()
     volkLoadDevice(state.device);
     vkGetDeviceQueue(state.device, state.graphics_family, 0, &state.graphics_queue);
     vkGetDeviceQueue(state.device, state.compute_family, 0, &state.compute_queue);
+
+    VkCommandPoolCreateInfo command_pool_create_info = {0};
+    command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    command_pool_create_info.queueFamilyIndex = state.graphics_family;
+
+    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.graphics_pool);
+    vk_check(result);
+    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.upload_pool);
+    vk_check(result);
+    command_pool_create_info.queueFamilyIndex = state.compute_family;
+    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.compute_pool);
+    vk_check(result);
 }
 
 void rhi_make_swapchain()
@@ -385,6 +400,9 @@ void rhi_shutdown()
 
     free(state.swap_chain_images);
     vkDestroySwapchainKHR(state.device, state.swap_chain, NULL);
+    vkDestroyCommandPool(state.device, state.compute_pool, NULL);
+    vkDestroyCommandPool(state.device, state.upload_pool, NULL);
+    vkDestroyCommandPool(state.device, state.graphics_pool, NULL);
     vkDestroyDevice(state.device, NULL);
     vkDestroySurfaceKHR(state.instance, state.surface, NULL);
     vkDestroyInstance(state.instance, NULL);
