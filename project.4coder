@@ -1,0 +1,44 @@
+version(1);
+project_name = "aurora";
+
+patterns = {
+    "*.c",
+    "*.cpp",
+    "*.h",
+    "*.m",
+    "*.mm",
+    "*.bat",
+    "*.sh",
+    "*.4coder",
+    "*.txt",
+    "*.ds",
+	"*.lua"
+};
+load_paths = {
+	{
+		{ {"."}, .recursive = true, .relative = true }, .os = "win"
+	},
+	{
+		{ {"src"}, .recursive = true, .relative = true}, .os = "win",
+        { {"ext"}, .recursive = true, .relative = true}, .os = "win"
+	}
+};
+
+build = "vcvarsall x64 && build.bat";
+run = "run.bat";
+
+command_list = {
+    {
+        .name = "build",
+        .out = "*compilation*", .footer_panel = true, .save_dirty_files = true, .cursor_at_end = true,
+        .cmd = { {build, .os = "win"}, },
+    },
+    {
+        .name = "run",
+        .out = "*compilation*", .footer_panel = true, .save_dirty_files = true, .cursor_at_end = true,
+        .cmd = { {run, .os ="win"}, },
+    },
+};
+
+fkey_command[1] = "build";
+fkey_command[3] = "run";

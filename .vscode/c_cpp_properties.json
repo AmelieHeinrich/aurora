@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${default}",
+                "${VULKAN_SDK}/Include",
+                "src",
+                "ext"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "VK_NO_PROTOTYPES",
+                "VK_USE_PLATFORM_WIN32_KHR"
+            ],
+            "windowsSdkVersion": "10.0.22000.0",
+            "compilerPath": "D:/VS2022/VC/Tools/MSVC/14.30.30705/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}
