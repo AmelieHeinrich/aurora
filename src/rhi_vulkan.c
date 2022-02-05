@@ -20,6 +20,8 @@ struct vk_state
     i32 layer_count;
     i32 extension_count;
 
+    VkSurfaceKHR surface;
+
     VkPhysicalDevice physical_device;
     u32 graphics_family;
     u32 compute_family;
@@ -33,7 +35,11 @@ struct vk_state
     char* device_extensions[64];
     i32 device_extension_count;
 
-    VkSurfaceKHR surface;
+    VkSwapchainKHR swap_chain;
+    VkExtent2D swap_chain_extent;
+    VkFormat swap_chain_format;
+    VkImage* swap_chain_images;
+    VkImageView swap_chain_image_views[FRAMES_IN_FLIGHT];
 };
 
 vk_state state;
@@ -295,6 +301,71 @@ void rhi_make_device()
     vkGetDeviceQueue(state.device, state.compute_family, 0, &state.compute_queue);
 }
 
+void rhi_make_swapchain()
+{
+    state.swap_chain_extent.width = platform.width;
+    state.swap_chain_extent.height = platform.height;
+    u32 queue_family_indices[] = { state.graphics_family };
+
+    VkSurfaceCapabilitiesKHR capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(state.physical_device, state.surface, &capabilities);
+
+    u32 format_count;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(state.physical_device, state.surface, &format_count, NULL);
+    VkSurfaceFormatKHR* formats = malloc(sizeof(VkSurfaceFormatKHR) * format_count);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(state.physical_device, state.surface, &format_count, formats);
+
+    VkSwapchainCreateInfoKHR create_info = { 0 };
+    create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    create_info.surface = state.surface;
+    create_info.minImageCount = FRAMES_IN_FLIGHT;
+    create_info.imageExtent = state.swap_chain_extent;
+    create_info.imageArrayLayers = 1;
+    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 1;
+    create_info.pQueueFamilyIndices = queue_family_indices;
+    create_info.preTransform = capabilities.currentTransform;
+    create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR; // TODO(milo): setting to enable vsync?
+    create_info.clipped = VK_TRUE;
+    create_info.oldSwapchain = VK_NULL_HANDLE;
+    create_info.imageFormat = formats[0].format;
+    create_info.imageColorSpace = formats[0].colorSpace;
+    free(formats);
+
+    state.swap_chain_format = create_info.imageFormat;
+
+    VkResult result = vkCreateSwapchainKHR(state.device, &create_info, NULL, &state.swap_chain);
+    vk_check(result);
+
+    u32 image_count = 0;
+    vkGetSwapchainImagesKHR(state.device, state.swap_chain, &image_count, NULL);
+    state.swap_chain_images = malloc(sizeof(VkImage) * image_count);
+    vkGetSwapchainImagesKHR(state.device, state.swap_chain, &image_count, state.swap_chain_images);
+    for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        VkImageViewCreateInfo iv_create_info = { 0 };
+        iv_create_info.flags = 0;
+        iv_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        iv_create_info.image = state.swap_chain_images[i];
+        iv_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        iv_create_info.format = state.swap_chain_format;
+        iv_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        iv_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        iv_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        iv_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        iv_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        iv_create_info.subresourceRange.baseMipLevel = 0;
+        iv_create_info.subresourceRange.levelCount = 1;
+        iv_create_info.subresourceRange.baseArrayLayer = 0;
+        iv_create_info.subresourceRange.layerCount = 1;
+
+        result = vkCreateImageView(state.device, &iv_create_info, NULL, &state.swap_chain_image_views[i]);
+        vk_check(result);
+    }
+}
+
 void rhi_init()
 {
     memset(&state, 0, sizeof(vk_state));
@@ -304,10 +375,16 @@ void rhi_init()
     aurora_platform_create_vk_surface(state.instance, &state.surface);
     rhi_make_physical_device();
     rhi_make_device();
+    rhi_make_swapchain();
 }
 
 void rhi_shutdown()
 {
+    for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
+        vkDestroyImageView(state.device, state.swap_chain_image_views[i], NULL);
+
+    free(state.swap_chain_images);
+    vkDestroySwapchainKHR(state.device, state.swap_chain, NULL);
     vkDestroyDevice(state.device, NULL);
     vkDestroySurfaceKHR(state.instance, state.surface, NULL);
     vkDestroyInstance(state.instance, NULL);

@@ -26,6 +26,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	case WM_CLOSE:
 		platform.quit = 1;
 		break;
+	case WM_SIZE:
+		platform.width = LOWORD(lparam);
+		platform.height = HIWORD(lparam);
+		break;
 	default:
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
