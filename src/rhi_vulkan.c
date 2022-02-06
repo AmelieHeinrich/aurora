@@ -1,5 +1,6 @@
 #include "rhi.h"
 #include "platform_layer.h"
+#include "vk_utils.h"
 
 #include <assert.h>
 #include <volk.h>
@@ -32,17 +33,26 @@ struct vk_state
     VkDevice device;
     VkQueue graphics_queue;
     VkQueue compute_queue;
-    VkCommandPool graphics_pool;
-    VkCommandPool compute_pool;
-    VkCommandPool upload_pool;
     char* device_extensions[64];
     i32 device_extension_count;
+    VkCommandPool graphics_pool;
+    VkCommandPool compute_pool;
+    VkFence compute_fence;
+    VkCommandPool upload_pool;
+    VkFence upload_fence;
 
     VkSwapchainKHR swap_chain;
     VkExtent2D swap_chain_extent;
     VkFormat swap_chain_format;
     VkImage* swap_chain_images;
     VkImageView swap_chain_image_views[FRAMES_IN_FLIGHT];
+    VkFence swap_chain_fences[FRAMES_IN_FLIGHT];
+    VkSemaphore image_available_semaphore;
+    VkSemaphore image_rendered_semaphore;
+    rhi_image rhi_swap_chain[FRAMES_IN_FLIGHT];
+    i32 image_index;
+
+    rhi_command_buf swap_chain_cmd_bufs[FRAMES_IN_FLIGHT];
 };
 
 vk_state state;
@@ -302,18 +312,6 @@ void rhi_make_device()
     volkLoadDevice(state.device);
     vkGetDeviceQueue(state.device, state.graphics_family, 0, &state.graphics_queue);
     vkGetDeviceQueue(state.device, state.compute_family, 0, &state.compute_queue);
-
-    VkCommandPoolCreateInfo command_pool_create_info = {0};
-    command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    command_pool_create_info.queueFamilyIndex = state.graphics_family;
-
-    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.graphics_pool);
-    vk_check(result);
-    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.upload_pool);
-    vk_check(result);
-    command_pool_create_info.queueFamilyIndex = state.compute_family;
-    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.compute_pool);
-    vk_check(result);
 }
 
 void rhi_make_swapchain()
@@ -358,6 +356,7 @@ void rhi_make_swapchain()
     vkGetSwapchainImagesKHR(state.device, state.swap_chain, &image_count, NULL);
     state.swap_chain_images = malloc(sizeof(VkImage) * image_count);
     vkGetSwapchainImagesKHR(state.device, state.swap_chain, &image_count, state.swap_chain_images);
+
     for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
         VkImageViewCreateInfo iv_create_info = { 0 };
@@ -378,7 +377,61 @@ void rhi_make_swapchain()
 
         result = vkCreateImageView(state.device, &iv_create_info, NULL, &state.swap_chain_image_views[i]);
         vk_check(result);
+
+        state.rhi_swap_chain[i].extent = state.swap_chain_extent;
+        state.rhi_swap_chain[i].format = state.swap_chain_format;
+        state.rhi_swap_chain[i].image = state.swap_chain_images[i];
+        state.rhi_swap_chain[i].image_view = state.swap_chain_image_views[i];
+        state.rhi_swap_chain[i].image_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
+}
+
+void rhi_make_sync()
+{
+    VkResult result;
+
+    VkFenceCreateInfo fence_info = { 0 };
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+    result = vkCreateFence(state.device, &fence_info, NULL, &state.upload_fence);
+    vk_check(result);
+
+    result = vkCreateFence(state.device, &fence_info, NULL, &state.compute_fence);
+    vk_check(result);
+
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    for (i32 i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        result = vkCreateFence(state.device, &fence_info, NULL, &state.swap_chain_fences[i]);
+        vk_check(result);
+    }
+
+    VkSemaphoreCreateInfo semaphore_info = { 0 };
+    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    result = vkCreateSemaphore(state.device, &semaphore_info, NULL, &state.image_available_semaphore);
+    vk_check(result);
+    result = vkCreateSemaphore(state.device, &semaphore_info, NULL, &state.image_rendered_semaphore);
+    vk_check(result);
+}
+
+void rhi_make_cmd()
+{
+    VkCommandPoolCreateInfo command_pool_create_info = {0};
+    command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    command_pool_create_info.queueFamilyIndex = state.graphics_family;
+    command_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+    VkResult result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.graphics_pool);
+    vk_check(result);
+    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.upload_pool);
+    vk_check(result);
+
+    command_pool_create_info.queueFamilyIndex = state.compute_family;
+    result = vkCreateCommandPool(state.device, &command_pool_create_info, NULL, &state.compute_pool);
+    vk_check(result);
+
+    for (i32 i = 0; i < FRAMES_IN_FLIGHT; i++)
+        rhi_init_cmd_buf(&state.swap_chain_cmd_bufs[i], COMMAND_BUFFER_GRAPHICS);
 }
 
 void rhi_init()
@@ -391,19 +444,291 @@ void rhi_init()
     rhi_make_physical_device();
     rhi_make_device();
     rhi_make_swapchain();
+    rhi_make_sync();
+    rhi_make_cmd();
+}
+
+void rhi_begin()
+{
+    vkAcquireNextImageKHR(state.device, state.swap_chain, UINT32_MAX, state.image_available_semaphore, VK_NULL_HANDLE, (u32*)&state.image_index);
+
+    rhi_command_buf* cmd_buf = &state.swap_chain_cmd_bufs[state.image_index];
+
+    vkWaitForFences(state.device, 1, &state.swap_chain_fences[state.image_index], VK_TRUE, UINT32_MAX);
+    vkResetFences(state.device, 1, &state.swap_chain_fences[state.image_index]);
+    vkResetCommandBuffer(cmd_buf->buf, 0);
+
+    rhi_begin_cmd_buf(cmd_buf);
+}
+
+void rhi_end()
+{
+    rhi_command_buf cmd_buf = state.swap_chain_cmd_bufs[state.image_index];
+    rhi_end_cmd_buf(&cmd_buf);
+
+    VkSubmitInfo submit_info = { 0 };
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore wait_semaphores[] = { state.image_available_semaphore };
+    VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = wait_semaphores;
+    submit_info.pWaitDstStageMask = wait_stages;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &cmd_buf.buf;
+
+    VkSemaphore signal_semaphores[] = { state.image_rendered_semaphore };
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = signal_semaphores;
+
+    vkResetFences(state.device, 1, &state.swap_chain_fences[state.image_index]);
+
+    VkResult result = vkQueueSubmit(state.graphics_queue, 1, &submit_info, state.swap_chain_fences[state.image_index]);
+    vk_check(result);
+}
+
+void rhi_present()
+{
+    VkSemaphore signal_semaphores[] = { state.image_rendered_semaphore };
+    VkPresentInfoKHR present_info = { 0 };
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = signal_semaphores;
+
+    VkSwapchainKHR swap_chains[] = { state.swap_chain };
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swap_chains;
+    present_info.pImageIndices = (u32*)&state.image_index;
+
+    vkQueuePresentKHR(state.graphics_queue, &present_info);
 }
 
 void rhi_shutdown()
 {
+    vkDeviceWaitIdle(state.device);
+
     for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroyFence(state.device, state.swap_chain_fences[i], NULL);
         vkDestroyImageView(state.device, state.swap_chain_image_views[i], NULL);
+    }
 
     free(state.swap_chain_images);
+    vkDestroySemaphore(state.device, state.image_available_semaphore, NULL);
+    vkDestroySemaphore(state.device, state.image_rendered_semaphore, NULL);
     vkDestroySwapchainKHR(state.device, state.swap_chain, NULL);
     vkDestroyCommandPool(state.device, state.compute_pool, NULL);
+    vkDestroyFence(state.device, state.compute_fence, NULL);
     vkDestroyCommandPool(state.device, state.upload_pool, NULL);
+    vkDestroyFence(state.device, state.upload_fence, NULL);
     vkDestroyCommandPool(state.device, state.graphics_pool, NULL);
     vkDestroyDevice(state.device, NULL);
     vkDestroySurfaceKHR(state.instance, state.surface, NULL);
     vkDestroyInstance(state.instance, NULL);
+}
+
+rhi_image* rhi_get_swapchain_image()
+{
+    return &state.rhi_swap_chain[state.image_index];
+}
+
+rhi_command_buf* rhi_get_swapchain_cmd_buf()
+{
+    return &state.swap_chain_cmd_bufs[state.image_index];
+}
+
+void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type)
+{
+    buf->command_buffer_type = command_buffer_type;
+
+    VkCommandBufferAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_buffer_type == COMMAND_BUFFER_GRAPHICS ? state.graphics_pool : state.compute_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = 1;
+
+    VkResult result = vkAllocateCommandBuffers(state.device, &alloc_info, &buf->buf);
+    vk_check(result);
+}
+
+void rhi_init_upload_cmd_buf(rhi_command_buf* buf)
+{   
+    buf->command_buffer_type = COMMAND_BUFFER_UPLOAD;
+
+    VkCommandBufferAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = state.upload_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = 1;
+
+    VkResult result = vkAllocateCommandBuffers(state.device, &alloc_info, &buf->buf);
+    vk_check(result);
+}
+
+void rhi_submit_cmd_buf(rhi_command_buf* buf)
+{   
+    rhi_end_cmd_buf(buf);
+
+    VkQueue submit_queue = buf->command_buffer_type == COMMAND_BUFFER_GRAPHICS ? state.graphics_queue : state.compute_queue;
+
+    VkSubmitInfo submit_info = { 0 };
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &buf->buf;
+
+    if (buf->command_buffer_type == COMMAND_BUFFER_COMPUTE)
+    {
+        vkQueueSubmit(state.compute_queue, 1, &submit_info, state.compute_fence);
+        vkWaitForFences(state.device, 1, &state.compute_fence, VK_TRUE, UINT32_MAX);
+        vkResetFences(state.device, 1, &state.compute_fence);
+        vkResetCommandPool(state.device, state.compute_pool, 0);
+    }
+    else
+    {
+        vkQueueSubmit(submit_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vkQueueWaitIdle(submit_queue);
+    }
+}
+
+void rhi_submit_upload_cmd_buf(rhi_command_buf* buf)
+{
+    VkSubmitInfo submit_info = { 0 };
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &buf->buf;
+
+    vkQueueSubmit(state.graphics_queue, 1, &submit_info, state.upload_fence);
+    vkWaitForFences(state.device, 1, &state.upload_fence, VK_TRUE, INT_MAX);
+    vkResetFences(state.device, 1, &state.upload_fence);
+    vkResetCommandPool(state.device, state.upload_pool, 0);
+}
+
+void rhi_begin_cmd_buf(rhi_command_buf* buf)
+{
+    VkCommandBufferBeginInfo begin_info = { 0 };
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    VkResult result = vkBeginCommandBuffer(buf->buf, &begin_info);
+    vk_check(result);
+}
+
+void rhi_end_cmd_buf(rhi_command_buf* buf)
+{
+    vk_check(vkEndCommandBuffer(buf->buf));
+}
+
+void rhi_cmd_set_viewport(rhi_command_buf* buf, u32 width, u32 height)
+{
+    VkViewport viewport = { 0 };
+    viewport.width = (f32)width;
+    viewport.height = (f32)height;
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor = { 0 };
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = (u32)width;
+    scissor.extent.height = (u32)height;
+
+    vkCmdSetViewport(buf->buf, 0, 1, &viewport);
+    vkCmdSetScissor(buf->buf, 0, 1, &scissor);
+}
+
+void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info)
+{
+    u32 color_iterator = info.has_depth ? info.image_count - 1 : info.image_count;
+
+    VkRect2D render_area = { 0 };
+    render_area.extent.width = (u32)info.width;
+    render_area.extent.height = (u32)info.height;
+    render_area.offset.x = 0;
+    render_area.offset.y = 0;
+
+    VkRenderingInfoKHR rendering_info = { 0 };
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    rendering_info.renderArea = render_area;
+    rendering_info.colorAttachmentCount = color_iterator;
+    rendering_info.layerCount = 1;
+
+    // Max attachment count is 64
+    VkRenderingAttachmentInfoKHR color_attachments[64] = { 0 };
+
+    for (u32 i = 0; i < color_iterator; i++)
+    {
+        rhi_image* image = info.images[i];
+
+        VkClearValue clear_value = { 0 };
+        clear_value.color.float32[0] = info.r;
+        clear_value.color.float32[1] = info.g;
+        clear_value.color.float32[2] = info.b;
+        clear_value.color.float32[3] = info.a;
+
+        VkRenderingAttachmentInfoKHR color_attachment_info = { 0 };
+        color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        color_attachment_info.imageView = image->image_view;
+        color_attachment_info.imageLayout = image->image_layout;
+        color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
+        color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment_info.clearValue = clear_value;
+
+        color_attachments[i] = color_attachment_info;
+    }
+
+    if (info.has_depth)
+    {
+        rhi_image* image = info.images[color_iterator];
+
+        VkClearValue depth_clear_value = { 0 };
+        depth_clear_value.depthStencil.depth = 1.0f;
+        depth_clear_value.depthStencil.stencil = 0.0f;
+
+        VkRenderingAttachmentInfoKHR depth_attachment = { 0 };
+        depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        depth_attachment.imageView = image->image_view;
+        depth_attachment.imageLayout = image->image_layout;
+        depth_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
+        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment.clearValue = depth_clear_value;
+
+        rendering_info.pStencilAttachment = &depth_attachment;
+        rendering_info.pDepthAttachment = &depth_attachment;
+    }
+
+    rendering_info.pColorAttachments = color_attachments;
+
+    vkCmdBeginRenderingKHR(buf->buf, &rendering_info);
+}
+
+void rhi_cmd_end_render(rhi_command_buf* buf)
+{
+    vkCmdEndRenderingKHR(buf->buf);
+}
+
+void rhi_cmd_img_transition_layout(rhi_command_buf* buf, rhi_image* img, u32 src_access, u32 dst_access, u32 src_layout, u32 dst_layout, u32 src_p_stage, u32 dst_p_stage, u32 layer)
+{
+    VkImageSubresourceRange range = { 0 };
+    range.baseMipLevel = 0;
+    range.levelCount = VK_REMAINING_MIP_LEVELS;
+    range.baseArrayLayer = layer;
+    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    range.aspectMask = (VkImageAspectFlagBits)vk_get_image_aspect(img->format);
+
+    VkImageMemoryBarrier barrier = { 0 };
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.srcAccessMask = src_access;
+    barrier.dstAccessMask = dst_access;
+    barrier.oldLayout = src_layout;
+    barrier.newLayout = dst_layout;
+    barrier.image = img->image;
+    barrier.subresourceRange = range;
+
+    vkCmdPipelineBarrier(buf->buf, src_p_stage, dst_p_stage, 0, 0, NULL, 0, NULL, 1, &barrier);
 }
