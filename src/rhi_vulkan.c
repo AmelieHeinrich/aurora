@@ -705,9 +705,9 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
                     attrib.binding = 0;
                     attrib.format = (VkFormat)var->format;
                     attrib.offset = vertex_input_binding_desc.stride;
-        
+
                     attribute_descriptions[i] = attrib;
-        
+
                     vertex_input_binding_desc.stride += vk_get_format_size(attrib.format);
                 }
             }
@@ -978,6 +978,16 @@ void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
     VkDeviceSize offsets[] = {0};
 
     vkCmdBindVertexBuffers(buf->buf, 0, 1, buffers, offsets);
+}
+
+void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
+{
+    vkCmdBindIndexBuffer(buf->buf, buffer->buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
+void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)
+{
+    vkCmdDrawIndexed(buf->buf, count, 1, 0, 0, 0);
 }
 
 void rhi_cmd_draw(rhi_command_buf* buf, u32 count)

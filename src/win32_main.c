@@ -10,9 +10,15 @@ void game_resize(u32 width, u32 height)
 }
 
 global f32 vertices[] = {
-	 0.0f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,
-	 0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f,
-	-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f
+	-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,
+	 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,
+	 0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f,
+	-0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f
+};
+
+global u32 indices[] = {
+	0, 1, 2,
+	2, 3, 0
 };
 
 int main()
@@ -27,6 +33,7 @@ int main()
 
 	rhi_pipeline triangle_pipeline;
 	rhi_buffer triangle_vertex_buffer;
+	rhi_buffer triangle_index_buffer;
 
 	{
 		rhi_shader_module vertex_shader;
@@ -50,6 +57,8 @@ int main()
 		rhi_init_graphics_pipeline(&triangle_pipeline, &descriptor);
 		rhi_allocate_buffer(&triangle_vertex_buffer, sizeof(vertices), BUFFER_VERTEX);
 		rhi_upload_buffer(&triangle_vertex_buffer, vertices, sizeof(vertices));
+		rhi_allocate_buffer(&triangle_index_buffer, sizeof(indices), BUFFER_INDEX);
+		rhi_upload_buffer(&triangle_index_buffer, indices, sizeof(indices));
 
 		rhi_free_shader(&pixel_shader);
 		rhi_free_shader(&vertex_shader);
@@ -79,7 +88,8 @@ int main()
 		rhi_cmd_set_viewport(cmd_buf, platform.width, platform.height);
 		rhi_cmd_set_graphics_pipeline(cmd_buf, &triangle_pipeline);
 		rhi_cmd_set_vertex_buffer(cmd_buf, &triangle_vertex_buffer);
-		rhi_cmd_draw(cmd_buf, 3);
+		rhi_cmd_set_index_buffer(cmd_buf, &triangle_index_buffer);
+		rhi_cmd_draw_indexed(cmd_buf, 6);
 		
 		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
 		rhi_cmd_end_render(cmd_buf);
@@ -93,6 +103,7 @@ int main()
 	rhi_wait_idle();
 
 	rhi_free_pipeline(&triangle_pipeline);
+	rhi_free_buffer(&triangle_index_buffer);
 	rhi_free_buffer(&triangle_vertex_buffer);
 
 	rhi_shutdown();
