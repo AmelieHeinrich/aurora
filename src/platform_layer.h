@@ -7,6 +7,8 @@
 
 #include <volk.h>
 
+typedef void (*aurora_resize_event)(u32, u32);
+
 typedef struct aurora_platform_layer aurora_platform_layer;
 struct aurora_platform_layer
 {	
@@ -15,6 +17,8 @@ struct aurora_platform_layer
 	b32 quit;
 	
 	char executable_directory[512];
+
+	aurora_resize_event resize_event;
 };
 
 extern aurora_platform_layer platform;

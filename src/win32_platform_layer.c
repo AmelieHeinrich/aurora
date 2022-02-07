@@ -29,6 +29,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	case WM_SIZE:
 		platform.width = LOWORD(lparam);
 		platform.height = HIWORD(lparam);
+		if (platform.resize_event != NULL)
+			platform.resize_event(platform.width, platform.height);
 		break;
 	default:
 		return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -39,6 +41,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 
 void aurora_platform_layer_init()
 {
+	memset(&platform, 0, sizeof(platform));
+	memset(&windows, 0, sizeof(windows));
+	
 	windows.application_hmodule = GetModuleHandle(NULL);
 	
 	GetModuleFileName(windows.application_hmodule, platform.executable_directory, 512);

@@ -577,6 +577,26 @@ void rhi_shutdown()
     vkDestroyInstance(state.instance, NULL);
 }
 
+void rhi_resize()
+{
+    if (state.swap_chain != VK_NULL_HANDLE)
+    {
+        for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
+            vkDestroyImageView(state.device, state.swap_chain_image_views[i], NULL);
+    
+        free(state.swap_chain_images);
+        vkDestroySwapchainKHR(state.device, state.swap_chain, NULL);
+    
+        rhi_make_swapchain();
+    }
+}
+
+void rhi_wait_idle()
+{
+    if (state.device)
+        vkDeviceWaitIdle(state.device);
+}
+
 rhi_image* rhi_get_swapchain_image()
 {
     return &state.rhi_swap_chain[state.image_index];

@@ -3,11 +3,18 @@
 
 #include <stdio.h>
 
+void game_resize(u32 width, u32 height)
+{
+	rhi_wait_idle();
+	rhi_resize();
+}
+
 int main()
 {
 	aurora_platform_layer_init();
 	platform.width = 1280;
 	platform.height = 720;
+	platform.resize_event = game_resize;
 	aurora_platform_open_window("Aurora Window");
 
 	rhi_init();
@@ -20,9 +27,9 @@ int main()
 		rhi_command_buf* cmd_buf = rhi_get_swapchain_cmd_buf();
 
 		rhi_render_begin begin = {0};
-		begin.r = 1.0f;
+		begin.r = 0.0f;
 		begin.g = 0.0f;
-		begin.b = 1.0f;
+		begin.b = 0.0f;
 		begin.a = 1.0f;
 		begin.has_depth = 0;
 		begin.width = platform.width;

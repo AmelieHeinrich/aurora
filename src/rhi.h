@@ -12,6 +12,7 @@ TODO: Descriptors
 Renderer TODOs:
 TODO: GLTF loading
 TODO: Render Graph
+TODO: (possibly) microui or cimgui?
 TODO: PBR environment maps
 TODO: Composite Pass
 TODO: Forward+ Rendering
@@ -64,6 +65,8 @@ void rhi_begin();
 void rhi_end();
 void rhi_present();
 void rhi_shutdown();
+void rhi_wait_idle();
+void rhi_resize();
 
 rhi_image* rhi_get_swapchain_image();
 rhi_command_buf* rhi_get_swapchain_cmd_buf();
