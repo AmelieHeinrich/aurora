@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/aurora.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "externalTerminal"
         }

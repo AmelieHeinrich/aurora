@@ -607,6 +607,25 @@ rhi_command_buf* rhi_get_swapchain_cmd_buf()
     return &state.swap_chain_cmd_bufs[state.image_index];
 }
 
+void rhi_load_shader(rhi_shader_module* shader, const char* path)
+{
+    shader->byte_code = (u32*)aurora_platform_read_file(path, &shader->byte_code_size);
+    
+    VkShaderModuleCreateInfo create_info = {0};
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = shader->byte_code_size;
+    create_info.pCode = shader->byte_code;
+    
+    VkResult res = vkCreateShaderModule(state.device, &create_info, NULL, &shader->shader_module);
+    vk_check(res);
+}
+
+void rhi_free_shader(rhi_shader_module* shader)
+{
+    vkDestroyShaderModule(state.device, shader->shader_module, NULL);
+    free(shader->byte_code);
+}
+
 void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type)
 {
     buf->command_buffer_type = command_buffer_type;

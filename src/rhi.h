@@ -3,7 +3,6 @@
 
 /*
 Vulkan TODOs:
-TODO: Pipelines
 TODO: Buffers
 TODO: Textures
 TODO: Profiler
@@ -25,6 +24,8 @@ TODO: Global Illumination
 #define COMMAND_BUFFER_GRAPHICS 0
 #define COMMAND_BUFFER_COMPUTE 1
 #define COMMAND_BUFFER_UPLOAD 2
+#define PIPELINE_GRAPHICS 3
+#define PIPELINE_COMPUTE 4
 
 // It's not like I'm going to implement another graphics API for this project, so we'll let the vulkan stuff public for now kekw
 #include "vulkan/vulkan.h"
@@ -46,6 +47,41 @@ struct rhi_command_buf
     VkCommandBuffer buf;
     u32 command_buffer_type;
 };
+
+typedef struct rhi_shader_module rhi_shader_module;
+struct rhi_shader_module
+{
+    VkShaderModule shader_module;
+    u32* byte_code;
+    u32 byte_code_size;
+};
+
+typedef struct rhi_pipeline_descriptor rhi_pipeline_descriptor;
+struct rhi_pipeline_descritpor
+{
+    struct {
+        rhi_shader_module* vs;
+        rhi_shader_module* ps;
+    } shaders;
+
+    VkPolygonMode polygon_mode;
+    VkCullModeFlagBits cull_mode;
+    VkFrontFace front_face;
+    b32 ccw;
+    VkCompareOp depth_op;
+
+    i32 color_attachment_count;
+    VkFormat depth_attachment_format;
+    VkFormat color_attachments_formats[32];
+};
+
+typedef struct rhi_pipeline rhi_pipeline;
+struct rhi_pipeline
+{
+    u32 pipeline_type;
+    VkPipeline pipeline;
+    VkPipelineLayout pipeline_layout;
+};  
 
 typedef struct rhi_render_begin rhi_render_begin;
 struct rhi_render_begin
@@ -71,6 +107,13 @@ void rhi_resize();
 rhi_image* rhi_get_swapchain_image();
 rhi_command_buf* rhi_get_swapchain_cmd_buf();
 
+// Pipeline/Shaders
+void rhi_load_shader(rhi_shader_module* shader, const char* path);
+void rhi_free_shader(rhi_shader_module* shader);
+void rhi_init_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* descriptor);
+void rhi_free_pipeline(rhi_pipeline* pipeline);
+
+// Cmd Buf
 void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type);
 void rhi_init_upload_cmd_buf(rhi_command_buf* buf);
 void rhi_submit_cmd_buf(rhi_command_buf* buf);

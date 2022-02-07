@@ -19,6 +19,11 @@ int main()
 
 	rhi_init();
 
+	rhi_shader_module vertex_shader;
+	rhi_shader_module pixel_shader;
+	rhi_load_shader(&vertex_shader, "shaders/triangle_vert.spv");
+	rhi_load_shader(&pixel_shader, "shaders/triangle_frag.spv");
+
 	while (!platform.quit)
 	{
 		rhi_begin();
@@ -48,6 +53,8 @@ int main()
 		aurora_platform_update_window();
 	}
 
+	rhi_free_shader(&pixel_shader);
+	rhi_free_shader(&vertex_shader);
 	rhi_shutdown();
 	
 	aurora_platform_free_window();

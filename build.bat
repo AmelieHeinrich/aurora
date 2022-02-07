@@ -1,6 +1,7 @@
 @echo off
 
 python build_shaders.py
+Xcopy shaders build\shaders\ /y
 
 set rootDir=%cd%
 if not exist build (
