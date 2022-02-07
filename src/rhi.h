@@ -1,6 +1,25 @@
 #ifndef RHI_H_INCLUDED
 #define RHI_H_INCLUDED
 
+/*
+Vulkan TODOs:
+TODO: Pipelines
+TODO: Buffers
+TODO: Textures
+TODO: Profiler
+TODO: Descriptors
+
+Renderer TODOs:
+TODO: GLTF loading
+TODO: Render Graph
+TODO: PBR environment maps
+TODO: Composite Pass
+TODO: Forward+ Rendering
+TODO: Mesh Shaders
+TODO: Shadows
+TODO: Global Illumination
+*/
+
 #define FRAMES_IN_FLIGHT 2
 #define COMMAND_BUFFER_GRAPHICS 0
 #define COMMAND_BUFFER_COMPUTE 1

@@ -6,7 +6,7 @@
                 "${default}",
                 "${VULKAN_SDK}/Include",
                 "src",
-                "ext"
+                "third_party"
             ],
             "defines": [
                 "_DEBUG",

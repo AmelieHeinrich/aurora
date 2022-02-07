@@ -1,5 +1,7 @@
 @echo off
 
+python build_shaders.py
+
 set rootDir=%cd%
 if not exist build (
     mkdir build

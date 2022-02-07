@@ -1,6 +1,7 @@
 #include "rhi.h"
 #include "platform_layer.h"
 #include "vk_utils.h"
+#include "vma.h"
 
 #include <assert.h>
 #include <volk.h>
@@ -53,6 +54,8 @@ struct vk_state
     i32 image_index;
 
     rhi_command_buf swap_chain_cmd_bufs[FRAMES_IN_FLIGHT];
+
+    VmaAllocator allocator;
 };
 
 vk_state state;
@@ -434,6 +437,50 @@ void rhi_make_cmd()
         rhi_init_cmd_buf(&state.swap_chain_cmd_bufs[i], COMMAND_BUFFER_GRAPHICS);
 }
 
+void rhi_make_allocator()
+{
+    VmaAllocatorCreateInfo allocator_info = { 0 };
+    allocator_info.device = state.device;
+    allocator_info.instance = state.instance;
+    allocator_info.physicalDevice = state.physical_device;
+    allocator_info.vulkanApiVersion = VK_API_VERSION_1_2;
+    VmaVulkanFunctions vulkanFunctions = {
+            vkGetPhysicalDeviceProperties,
+            vkGetPhysicalDeviceMemoryProperties,
+            vkAllocateMemory,
+            vkFreeMemory,
+            vkMapMemory,
+            vkUnmapMemory,
+            vkFlushMappedMemoryRanges,
+            vkInvalidateMappedMemoryRanges,
+            vkBindBufferMemory,
+            vkBindImageMemory,
+            vkGetBufferMemoryRequirements,
+            vkGetImageMemoryRequirements,
+            vkCreateBuffer,
+            vkDestroyBuffer,
+            vkCreateImage,
+            vkDestroyImage,
+            vkCmdCopyBuffer,
+#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
+                vkGetBufferMemoryRequirements2,
+                vkGetImageMemoryRequirements2,
+#endif
+#if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
+                vkBindBufferMemory2,
+                vkBindImageMemory2,
+#endif
+#if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
+                vkGetPhysicalDeviceMemoryProperties2,
+#endif
+    };
+
+    allocator_info.pVulkanFunctions = &vulkanFunctions;
+
+    VkResult result = vmaCreateAllocator(&allocator_info, &state.allocator);
+    assert(result == VK_SUCCESS);
+}
+
 void rhi_init()
 {
     memset(&state, 0, sizeof(vk_state));
@@ -446,6 +493,7 @@ void rhi_init()
     rhi_make_swapchain();
     rhi_make_sync();
     rhi_make_cmd();
+    rhi_make_allocator();
 }
 
 void rhi_begin()
@@ -506,6 +554,8 @@ void rhi_present()
 void rhi_shutdown()
 {
     vkDeviceWaitIdle(state.device);
+
+    vmaDestroyAllocator(state.allocator);
 
     for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
