@@ -2,6 +2,7 @@
 #include "platform_layer.h"
 #include "vk_utils.h"
 #include "spirv_reflect.h"
+#include "stb_image.h"
 
 #include <assert.h>
 #include <volk.h>
@@ -864,6 +865,160 @@ void rhi_upload_buffer(rhi_buffer* buffer, void* data, u32 size)
     vmaMapMemory(state.allocator, buffer->allocation, &buf);
     memcpy(buf, data, size);
     vmaUnmapMemory(state.allocator, buffer->allocation);
+}
+
+void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format, u32 usage)
+{
+    image->width = width;
+    image->height = height;
+    image->format = format;
+    image->image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->usage = usage;
+    image->extent.width = width;
+    image->extent.height = height;
+
+    VkImageCreateInfo image_create_info = { 0 };
+    image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.extent.width = width;
+    image_create_info.extent.height = height;
+    image_create_info.format = format;
+    image_create_info.extent.depth = 1;
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.usage = (VkImageUsageFlagBits)usage;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocation = { 0 };
+    allocation.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkResult res = vmaCreateImage(state.allocator, &image_create_info, &allocation, &image->image, &image->allocation, NULL);
+    vk_check(res);
+
+    VkImageViewCreateInfo view_info = { 0 };
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = image->image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = image->format;
+    view_info.subresourceRange.aspectMask = vk_get_image_aspect(image->format);
+    view_info.subresourceRange.baseMipLevel = 0;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 1;
+    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+}
+
+void rhi_load_image(rhi_image* image, const char* path)
+{
+    stbi_set_flip_vertically_on_load(1);
+    i32 width, height, channels = 0;
+    u8* data = stbi_load(path, &width, &height, &channels, STBI_rgb_alpha);
+    assert(data);
+    i64 image_size = width * height * 4;
+
+    image->format = VK_FORMAT_R8G8B8A8_UNORM;
+    image->extent.width = width;
+    image->extent.height = height;
+    image->width = width;
+    image->height = height;
+    image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    image->image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkImageCreateInfo image_create_info = { 0 };
+    image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.extent.width = width;
+    image_create_info.extent.height = height;
+    image_create_info.format = image->format;
+    image_create_info.extent.depth = 1;
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocation = { 0 };
+    allocation.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkResult res = vmaCreateImage(state.allocator, &image_create_info, &allocation, &image->image, &image->allocation, NULL);
+    vk_check(res);
+
+    VkBuffer staging_buffer = VK_NULL_HANDLE;
+    VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
+    VmaAllocationInfo staging_buffer_allocation_info = {0};
+
+    VkBufferCreateInfo staging_buffer_info = { 0 };
+    staging_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    staging_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    staging_buffer_info.size = image_size;
+
+    VmaAllocationCreateInfo staging_buffer_alloc_info = { 0 };
+    staging_buffer_alloc_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    res = vmaCreateBuffer(state.allocator, &staging_buffer_info, &staging_buffer_alloc_info, &staging_buffer, &staging_buffer_allocation, NULL);
+    vk_check(res);
+
+    void* upload_data;
+    vmaMapMemory(state.allocator, staging_buffer_allocation, &upload_data);
+    memcpy(upload_data, data, image_size);
+    vmaUnmapMemory(state.allocator, staging_buffer_allocation);
+
+    VkBufferImageCopy image_copy_region = {0};
+    image_copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_copy_region.imageSubresource.mipLevel = 0;
+    image_copy_region.imageSubresource.baseArrayLayer = 0;
+    image_copy_region.imageSubresource.layerCount = 1;
+    image_copy_region.imageExtent.width = width;
+    image_copy_region.imageExtent.height = height;
+    image_copy_region.imageExtent.depth = 1;
+
+    rhi_command_buf temp;
+    rhi_init_upload_cmd_buf(&temp);
+    rhi_cmd_img_transition_layout(&temp, image, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
+    vkCmdCopyBufferToImage(temp.buf, staging_buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy_region);
+    rhi_cmd_img_transition_layout(&temp, image, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
+    rhi_submit_upload_cmd_buf(&temp);
+
+    vmaDestroyBuffer(state.allocator, staging_buffer, staging_buffer_allocation);
+    stbi_image_free(data);
+
+    VkImageViewCreateInfo view_info = { 0 };
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = image->image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = image->format;
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.baseMipLevel = 0;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 1;
+    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
+    assert(res == VK_SUCCESS);
+}
+
+void rhi_free_image(rhi_image* image)
+{
+    vkDestroyImageView(state.device, image->image_view, NULL);
+    vmaDestroyImage(state.allocator, image->image, image->allocation);
+}
+
+void rhi_resize_image(rhi_image* image, i32 width, i32 height)
+{
+    rhi_free_image(image);
+    rhi_allocate_image(image, image->width, image->height, image->format, image->usage);
 }
 
 void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type)

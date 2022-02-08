@@ -29,6 +29,9 @@ TODO: Global Illumination
 #define BUFFER_VERTEX VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 #define BUFFER_INDEX VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 #define BUFFER_UNIFORM VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+#define IMAGE_RTV VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
+#define IMAGE_DSV VK_IMAGE_USAGE_DEPTH_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
+#define IMAGE_STORAGE VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_SAMPLED_BIT
 
 // It's not like I'm going to implement another graphics API for this project, so we'll let the vulkan stuff public for now kekw
 #include "vulkan/vulkan.h"
@@ -43,6 +46,11 @@ struct rhi_image
     VkFormat format;
     VkExtent2D extent;
     VkImageLayout image_layout;
+
+    VmaAllocation allocation;
+
+    i32 width, height;
+    u32 usage;
 };
 
 typedef struct rhi_command_buf rhi_command_buf;
@@ -135,6 +143,12 @@ void rhi_free_pipeline(rhi_pipeline* pipeline);
 void rhi_allocate_buffer(rhi_buffer* buffer, u32 size, u32 buffer_usage);
 void rhi_free_buffer(rhi_buffer* buffer);
 void rhi_upload_buffer(rhi_buffer* buffer, void* data, u32 size);
+
+// Image
+void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format, u32 usage);
+void rhi_load_image(rhi_image* image, const char* path);
+void rhi_free_image(rhi_image* image);
+void rhi_resize_image(rhi_image* image, i32 width, i32 height);
 
 // Cmd Buf
 void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type);
