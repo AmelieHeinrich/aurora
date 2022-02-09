@@ -2,10 +2,6 @@
 #define RHI_H_INCLUDED
 
 /*
-Vulkan TODOs:
-TODO: Descriptors
-MAYBE: Profiler
-
 Renderer TODOs:
 TODO: GLTF loading
 TODO: Render Graph
@@ -104,6 +100,7 @@ struct rhi_pipeline_descriptor
     struct {
         rhi_shader_module* vs;
         rhi_shader_module* ps;
+        rhi_shader_module* cs;
         rhi_shader_module* ms;
         rhi_shader_module* ts;
     } shaders;
@@ -127,6 +124,7 @@ typedef struct rhi_pipeline rhi_pipeline;
 struct rhi_pipeline
 {
     u32 pipeline_type;
+    VkPipelineBindPoint bind_point;
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
 };  
@@ -193,6 +191,7 @@ void rhi_free_sampler(rhi_sampler* sampler);
 void rhi_load_shader(rhi_shader_module* shader, const char* path);
 void rhi_free_shader(rhi_shader_module* shader);
 void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* descriptor);
+void rhi_init_compute_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* descriptor);
 void rhi_free_pipeline(rhi_pipeline* pipeline);
 
 // Buffer
@@ -222,13 +221,15 @@ void rhi_submit_upload_cmd_buf(rhi_command_buf* buf);
 void rhi_begin_cmd_buf(rhi_command_buf* buf);
 void rhi_end_cmd_buf(rhi_command_buf* buf);
 void rhi_cmd_set_viewport(rhi_command_buf* buf, u32 width, u32 height);
-void rhi_cmd_set_graphics_pipeline(rhi_command_buf* buf, rhi_pipeline* pipeline);
+void rhi_cmd_set_pipeline(rhi_command_buf* buf, rhi_pipeline* pipeline);
 void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding);
 void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_set* set, i32 binding);
 void rhi_cmd_draw(rhi_command_buf* buf, u32 count);
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count);
+void rhi_cmd_draw_meshlets(rhi_command_buf* buf, u32 count);
+void rhi_cmd_dispatch(rhi_command_buf* buf, u32 x, u32 y, u32 z);
 void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info);
 void rhi_cmd_end_render(rhi_command_buf* buf);
 void rhi_cmd_img_transition_layout(rhi_command_buf* buf, rhi_image* img, u32 src_access, u32 dst_access, u32 src_layout, u32 dst_layout, u32 src_p_stage, u32 dst_p_stage, u32 layer);

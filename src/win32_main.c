@@ -17,10 +17,10 @@ void game_resize(u32 width, u32 height)
 }
 
 global f32 vertices[] = {
-	-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-	 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-	 0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-	-0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f
+	-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+	 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+	 0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+	-0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f
 };
 
 global u32 indices[] = {
@@ -128,7 +128,7 @@ int main()
 		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
 		
 		rhi_cmd_set_viewport(cmd_buf, platform.width, platform.height);
-		rhi_cmd_set_graphics_pipeline(cmd_buf, &triangle_pipeline);
+		rhi_cmd_set_pipeline(cmd_buf, &triangle_pipeline);
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &image_heap, 0);
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
 		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);

@@ -801,6 +801,7 @@ void rhi_free_shader(rhi_shader_module* shader)
 
 void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* descriptor)
 {
+    pipeline->bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
     pipeline->pipeline_type = PIPELINE_GRAPHICS;
 
     VkPipelineShaderStageCreateInfo pipeline_shader_stages[3];
@@ -1011,6 +1012,37 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
     }
 
     res = vkCreateGraphicsPipelines(state.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline->pipeline);
+    vk_check(res);
+}
+
+void rhi_init_compute_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* descriptor)
+{
+    pipeline->bind_point = VK_PIPELINE_BIND_POINT_COMPUTE;
+    pipeline->pipeline_type = PIPELINE_COMPUTE;
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {0};
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    if (descriptor->set_layout_count > 0)
+    {
+        VkDescriptorSetLayout layouts[16];
+        for (i32 i = 0; i < descriptor->set_layout_count; i++)
+            layouts[i] = descriptor->set_layouts[i]->layout;
+
+        pipeline_layout_info.setLayoutCount = descriptor->set_layout_count;
+        pipeline_layout_info.pSetLayouts = layouts;
+    }
+
+    VkResult res = vkCreatePipelineLayout(state.device, &pipeline_layout_info, NULL, &pipeline->pipeline_layout);
+    vk_check(res);
+
+    VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    info.stage.module = descriptor->shaders.cs->shader_module;
+    info.stage.pName = "main";
+    info.layout = pipeline->pipeline_layout;
+
+    res = vkCreateComputePipelines(state.device, VK_NULL_HANDLE, 1, &info, NULL, &pipeline->pipeline);
     vk_check(res);
 }
 
@@ -1388,9 +1420,9 @@ void rhi_cmd_set_viewport(rhi_command_buf* buf, u32 width, u32 height)
     vkCmdSetScissor(buf->buf, 0, 1, &scissor);
 }
 
-void rhi_cmd_set_graphics_pipeline(rhi_command_buf* buf, rhi_pipeline* pipeline)
+void rhi_cmd_set_pipeline(rhi_command_buf* buf, rhi_pipeline* pipeline)
 {
-    vkCmdBindPipeline(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    vkCmdBindPipeline(buf->buf, pipeline->bind_point, pipeline->pipeline);
 }
 
 void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
@@ -1408,12 +1440,12 @@ void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
 
 void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding)
 {
-    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, binding, 1, &heap->set, 0, NULL);
+    vkCmdBindDescriptorSets(buf->buf, pipeline->bind_point, pipeline->pipeline_layout, binding, 1, &heap->set, 0, NULL);
 }
 
 void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_set* set, i32 binding)
 {
-    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, binding, 1, &set->set, 0, NULL);
+    vkCmdBindDescriptorSets(buf->buf, pipeline->bind_point, pipeline->pipeline_layout, binding, 1, &set->set, 0, NULL);
 }
 
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)
@@ -1424,6 +1456,16 @@ void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)
 void rhi_cmd_draw(rhi_command_buf* buf, u32 count)
 {
     vkCmdDraw(buf->buf, count, 1, 0, 0);
+}
+
+void rhi_cmd_draw_meshlets(rhi_command_buf* buf, u32 count)
+{
+    vkCmdDrawMeshTasksNV(buf->buf, count, 0);
+}
+
+void rhi_cmd_dispatch(rhi_command_buf* buf, u32 x, u32 y, u32 z)
+{
+    vkCmdDispatch(buf->buf, x, y, z);
 }
 
 void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info)
