@@ -3,6 +3,13 @@
 
 #include <stdio.h>
 
+typedef struct bindless_material bindless_material;
+struct bindless_material
+{
+	u32 texture_index;
+	u32 sampler_index;
+};	
+
 void game_resize(u32 width, u32 height)
 {
 	rhi_wait_idle();
@@ -31,11 +38,37 @@ int main()
 
 	rhi_init();
 
+	rhi_descriptor_heap image_heap;
+	rhi_descriptor_heap sampler_heap;
+	rhi_init_descriptor_heap(&image_heap, DESCRIPTOR_HEAP_IMAGE, 64);
+	rhi_init_descriptor_heap(&sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 8);
+
 	rhi_pipeline triangle_pipeline;
+	rhi_descriptor_set_layout material_set_layout;
+	rhi_descriptor_set material_set;
+	rhi_image triangle_texture;
+	rhi_sampler triangle_sampler;
 	rhi_buffer triangle_vertex_buffer;
 	rhi_buffer triangle_index_buffer;
+	rhi_buffer triangle_material;
+	bindless_material triangle_bindless;
 
 	{
+		material_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
+		material_set_layout.descriptor_count = 1;
+		material_set_layout.binding = 2;
+		rhi_init_descriptor_set_layout(&material_set_layout);
+
+		triangle_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		triangle_sampler.filter = VK_FILTER_NEAREST;
+		rhi_init_sampler(&triangle_sampler);
+		rhi_load_image(&triangle_texture, "assets/texture.jpg");
+		triangle_bindless.texture_index = rhi_find_available_descriptor(&image_heap);
+		triangle_bindless.sampler_index = rhi_find_available_descriptor(&sampler_heap);
+
+		rhi_push_descriptor_heap_image(&image_heap, &triangle_texture, triangle_bindless.texture_index);
+		rhi_push_descriptor_heap_sampler(&sampler_heap, &triangle_sampler, triangle_bindless.sampler_index);
+
 		rhi_shader_module vertex_shader;
 		rhi_shader_module pixel_shader;
 		rhi_load_shader(&vertex_shader, "shaders/triangle_vert.vert.spv");
@@ -53,12 +86,21 @@ int main()
 		descriptor.use_mesh_shaders = 0;
 		descriptor.shaders.vs = &vertex_shader;
 		descriptor.shaders.ps = &pixel_shader;
+		descriptor.set_layout_count = 3;
+		descriptor.set_layouts[0] = rhi_get_image_heap_set_layout();
+		descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
+		descriptor.set_layouts[2] = &material_set_layout;
 	
 		rhi_init_graphics_pipeline(&triangle_pipeline, &descriptor);
 		rhi_allocate_buffer(&triangle_vertex_buffer, sizeof(vertices), BUFFER_VERTEX);
 		rhi_upload_buffer(&triangle_vertex_buffer, vertices, sizeof(vertices));
 		rhi_allocate_buffer(&triangle_index_buffer, sizeof(indices), BUFFER_INDEX);
 		rhi_upload_buffer(&triangle_index_buffer, indices, sizeof(indices));
+		rhi_allocate_buffer(&triangle_material, sizeof(bindless_material), BUFFER_UNIFORM);
+		rhi_upload_buffer(&triangle_material, &triangle_bindless, sizeof(bindless_material));
+
+		rhi_init_descriptor_set(&material_set, &material_set_layout);
+		rhi_descriptor_set_write_buffer(&material_set, &triangle_material, sizeof(bindless_material), 0);
 
 		rhi_free_shader(&pixel_shader);
 		rhi_free_shader(&vertex_shader);
@@ -87,6 +129,9 @@ int main()
 		
 		rhi_cmd_set_viewport(cmd_buf, platform.width, platform.height);
 		rhi_cmd_set_graphics_pipeline(cmd_buf, &triangle_pipeline);
+		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &image_heap, 0);
+		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
+		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);
 		rhi_cmd_set_vertex_buffer(cmd_buf, &triangle_vertex_buffer);
 		rhi_cmd_set_index_buffer(cmd_buf, &triangle_index_buffer);
 		rhi_cmd_draw_indexed(cmd_buf, 6);
@@ -103,8 +148,16 @@ int main()
 	rhi_wait_idle();
 
 	rhi_free_pipeline(&triangle_pipeline);
+	rhi_free_descriptor_set(&material_set);
+	rhi_free_buffer(&triangle_material);
 	rhi_free_buffer(&triangle_index_buffer);
 	rhi_free_buffer(&triangle_vertex_buffer);
+	rhi_free_image(&triangle_texture);
+	rhi_free_sampler(&triangle_sampler);
+	rhi_free_descriptor_set_layout(&material_set_layout);
+
+	rhi_free_descriptor_heap(&image_heap);
+	rhi_free_descriptor_heap(&sampler_heap);
 
 	rhi_shutdown();
 	

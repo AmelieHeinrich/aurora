@@ -34,6 +34,7 @@ TODO: Global Illumination
 #define DESCRIPTOR_HEAP_SAMPLER 1
 #define DESCRIPTOR_IMAGE VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 #define DESCRIPTOR_SAMPLER VK_DESCRIPTOR_TYPE_SAMPLER
+#define DESCRIPTOR_BUFFER VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
 
 // It's not like I'm going to implement another graphics API for this project, so we'll let the vulkan stuff public for now kekw
 #include "vulkan/vulkan.h"
@@ -53,6 +54,14 @@ struct rhi_image
 
     i32 width, height;
     u32 usage;
+};
+
+typedef struct rhi_sampler rhi_sampler;
+struct rhi_sampler
+{
+    VkSamplerAddressMode address_mode;
+    VkFilter filter;
+    VkSampler sampler;
 };
 
 typedef struct rhi_command_buf rhi_command_buf;
@@ -80,6 +89,13 @@ struct rhi_descriptor_set_layout
     VkDescriptorSetLayout layout;
 };
 
+typedef struct rhi_descriptor_set rhi_descriptor_set;
+struct rhi_descriptor_set
+{
+    i32 binding;
+    VkDescriptorSet set;
+};
+
 typedef struct rhi_pipeline_descriptor rhi_pipeline_descriptor;
 struct rhi_pipeline_descriptor
 {
@@ -103,7 +119,7 @@ struct rhi_pipeline_descriptor
     VkFormat depth_attachment_format;
     VkFormat color_attachments_formats[32];
 
-    rhi_descriptor_set_layout set_layouts[16];
+    rhi_descriptor_set_layout* set_layouts[16];
     u32 set_layout_count;
 };
 
@@ -157,10 +173,21 @@ void rhi_resize();
 
 rhi_image* rhi_get_swapchain_image();
 rhi_command_buf* rhi_get_swapchain_cmd_buf();
+rhi_descriptor_set_layout* rhi_get_image_heap_set_layout();
+rhi_descriptor_set_layout* rhi_get_sampler_heap_set_layout();
 
 // Descriptor set layout
 void rhi_init_descriptor_set_layout(rhi_descriptor_set_layout* layout);
 void rhi_free_descriptor_set_layout(rhi_descriptor_set_layout* layout);
+
+// Descriptor set
+void rhi_init_descriptor_set(rhi_descriptor_set* set, rhi_descriptor_set_layout* layout);
+void rhi_free_descriptor_set(rhi_descriptor_set* set);
+void rhi_descriptor_set_write_buffer(rhi_descriptor_set* set, rhi_buffer* buffer, i32 size, i32 binding);
+
+// Samplers
+void rhi_init_sampler(rhi_sampler* sampler);
+void rhi_free_sampler(rhi_sampler* sampler);
 
 // Pipeline/Shaders
 void rhi_load_shader(rhi_shader_module* shader, const char* path);
@@ -181,7 +208,9 @@ void rhi_resize_image(rhi_image* image, i32 width, i32 height);
 
 // Descriptor heap
 void rhi_init_descriptor_heap(rhi_descriptor_heap* heap, u32 type, u32 size);
-i32 rhi_allocate_descriptor(rhi_descriptor_heap* heap);
+i32 rhi_find_available_descriptor(rhi_descriptor_heap* heap);
+void rhi_push_descriptor_heap_image(rhi_descriptor_heap* heap, rhi_image* image, i32 binding);
+void rhi_push_descriptor_heap_sampler(rhi_descriptor_heap* heap, rhi_sampler* sampler, i32 binding);
 void rhi_free_descriptor(rhi_descriptor_heap* heap, u32 descriptor);
 void rhi_free_descriptor_heap(rhi_descriptor_heap* heap);
 
@@ -197,6 +226,7 @@ void rhi_cmd_set_graphics_pipeline(rhi_command_buf* buf, rhi_pipeline* pipeline)
 void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding);
+void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_set* set, i32 binding);
 void rhi_cmd_draw(rhi_command_buf* buf, u32 count);
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count);
 void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info);

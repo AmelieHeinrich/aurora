@@ -60,6 +60,9 @@ struct vk_state
     VkDescriptorPool descriptor_pool;
     VkDescriptorSetLayout image_heap_layout;
     VkDescriptorSetLayout sampler_heap_layout;
+
+    rhi_descriptor_set_layout rhi_image_heap;
+    rhi_descriptor_set_layout rhi_sampler_heap;
 };
 
 vk_state state;
@@ -258,10 +261,15 @@ void rhi_make_device()
     mesh_shader_features.meshShader = VK_TRUE;
     mesh_shader_features.pNext = &features8;
 
+    VkPhysicalDeviceDescriptorIndexingFeatures indexing_features = {0};
+    indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    indexing_features.descriptorBindingPartiallyBound = 1;
+    indexing_features.pNext = &mesh_shader_features;
+
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_features = { 0 };
     dynamic_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
     dynamic_features.dynamicRendering = 1;
-    dynamic_features.pNext = &mesh_shader_features;
+    dynamic_features.pNext = &indexing_features; 
 
     state.physical_device_features.pNext = &dynamic_features;
 
@@ -294,6 +302,10 @@ void rhi_make_device()
 
             if (!strcmp(VK_NV_MESH_SHADER_EXTENSION_NAME, properties[i].extensionName)) {
                 state.device_extensions[state.device_extension_count++] = VK_NV_MESH_SHADER_EXTENSION_NAME;
+            }
+
+            if (!strcmp(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, properties[i].extensionName)) {
+                state.device_extensions[state.device_extension_count++] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
             }
         }
 
@@ -499,6 +511,7 @@ void rhi_make_descriptors()
     pool_info.pPoolSizes = sizes;
     pool_info.poolSizeCount = 4;
     pool_info.maxSets = 16;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
     VkResult res = vkCreateDescriptorPool(state.device, &pool_info, NULL, &state.descriptor_pool);
     vk_check(res);
@@ -509,18 +522,36 @@ void rhi_make_descriptors()
     binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     binding.stageFlags = VK_SHADER_STAGE_ALL;
 
+    VkDescriptorBindingFlags flag = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {0};
+    binding_flags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    binding_flags.bindingCount = 1;
+    binding_flags.pBindingFlags = &flag;
+
     VkDescriptorSetLayoutCreateInfo set_layout_info = {0};
     set_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     set_layout_info.bindingCount = 1;
     set_layout_info.pBindings = &binding;
+    set_layout_info.pNext = &binding_flags;
     
     res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &state.image_heap_layout);
     vk_check(res);
 
+    binding.binding = 0;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
 
     res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &state.sampler_heap_layout);
     vk_check(res);
+
+    state.rhi_image_heap.binding = 0;
+    state.rhi_image_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    state.rhi_image_heap.descriptor_count = 1024;
+    state.rhi_image_heap.layout = state.image_heap_layout;
+
+    state.rhi_sampler_heap.binding = 1;
+    state.rhi_sampler_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLER;
+    state.rhi_sampler_heap.descriptor_count = 1024;
+    state.rhi_sampler_heap.layout = state.sampler_heap_layout;
 }
 
 void rhi_init()
@@ -653,6 +684,16 @@ rhi_command_buf* rhi_get_swapchain_cmd_buf()
     return &state.swap_chain_cmd_bufs[state.image_index];
 }
 
+rhi_descriptor_set_layout* rhi_get_image_heap_set_layout()
+{
+    return &state.rhi_image_heap;
+}
+
+rhi_descriptor_set_layout* rhi_get_sampler_heap_set_layout()
+{
+    return &state.rhi_sampler_heap;
+}
+
 void rhi_init_descriptor_set_layout(rhi_descriptor_set_layout* layout)
 {
     VkDescriptorSetLayoutBinding bindings[32] = {0};
@@ -676,6 +717,67 @@ void rhi_init_descriptor_set_layout(rhi_descriptor_set_layout* layout)
 void rhi_free_descriptor_set_layout(rhi_descriptor_set_layout* layout)
 {
     vkDestroyDescriptorSetLayout(state.device, layout->layout, NULL);
+}
+
+void rhi_init_descriptor_set(rhi_descriptor_set* set, rhi_descriptor_set_layout* layout)
+{
+    VkDescriptorSetAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = state.descriptor_pool;
+    alloc_info.pSetLayouts = &layout->layout;
+    alloc_info.descriptorSetCount = 1;
+
+    VkResult res = vkAllocateDescriptorSets(state.device, &alloc_info, &set->set);
+    vk_check(res);
+}
+
+void rhi_free_descriptor_set(rhi_descriptor_set* set)
+{
+    vkFreeDescriptorSets(state.device, state.descriptor_pool, 1, &set->set);
+}
+
+void rhi_descriptor_set_write_buffer(rhi_descriptor_set* set, rhi_buffer* buffer, i32 size, i32 binding)
+{
+    VkDescriptorBufferInfo buffer_info = {0};
+    buffer_info.buffer = buffer->buffer;
+    buffer_info.offset = 0;
+    buffer_info.range = size;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pBufferInfo = &buffer_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
+void rhi_init_sampler(rhi_sampler* sampler)
+{
+    VkSamplerCreateInfo create_info = {0};
+    create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    create_info.magFilter = sampler->filter;
+    create_info.minFilter = sampler->filter;
+    create_info.addressModeU = sampler->address_mode;
+    create_info.addressModeV = create_info.addressModeU;
+    create_info.addressModeW = create_info.addressModeU;
+    create_info.anisotropyEnable = 1;
+    create_info.maxAnisotropy = state.physical_device_properties_2.properties.limits.maxSamplerAnisotropy;
+    create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    create_info.compareEnable = 0;
+    create_info.compareOp = VK_COMPARE_OP_NEVER;
+    create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    VkResult res = vkCreateSampler(state.device, &create_info, NULL, &sampler->sampler);
+    vk_check(res);
+}
+
+void rhi_free_sampler(rhi_sampler* sampler)
+{
+    vkDestroySampler(state.device, sampler->sampler, NULL);
 }
 
 void rhi_load_shader(rhi_shader_module* shader, const char* path)
@@ -869,7 +971,7 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
     {
         VkDescriptorSetLayout layouts[16];
         for (i32 i = 0; i < descriptor->set_layout_count; i++)
-            layouts[i] = descriptor->set_layouts[i].layout;
+            layouts[i] = descriptor->set_layouts[i]->layout;
 
         pipeline_layout_info.setLayoutCount = descriptor->set_layout_count;
         pipeline_layout_info.pSetLayouts = layouts;
@@ -995,7 +1097,6 @@ void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format
 
 void rhi_load_image(rhi_image* image, const char* path)
 {
-    stbi_set_flip_vertically_on_load(1);
     i32 width, height, channels = 0;
     u8* data = stbi_load(path, &width, &height, &channels, STBI_rgb_alpha);
     assert(data);
@@ -1061,9 +1162,11 @@ void rhi_load_image(rhi_image* image, const char* path)
 
     rhi_command_buf temp;
     rhi_init_upload_cmd_buf(&temp);
+    rhi_begin_cmd_buf(&temp);
     rhi_cmd_img_transition_layout(&temp, image, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
     vkCmdCopyBufferToImage(temp.buf, staging_buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy_region);
     rhi_cmd_img_transition_layout(&temp, image, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
+    rhi_end_cmd_buf(&temp);
     rhi_submit_upload_cmd_buf(&temp);
 
     vmaDestroyBuffer(state.allocator, staging_buffer, staging_buffer_allocation);
@@ -1119,13 +1222,14 @@ void rhi_init_descriptor_heap(rhi_descriptor_heap* heap, u32 type, u32 size)
     vk_check(res);
 }
 
-i32 rhi_allocate_descriptor(rhi_descriptor_heap* heap)
+i32 rhi_find_available_descriptor(rhi_descriptor_heap* heap)
 {
     for (i32 i = 0; i < heap->size; i++)
     {
         if (heap->heap_handle[i] == 0)
         {
             heap->heap_handle[i] = 1;
+            heap->used++;
             return i;
         }
     }
@@ -1133,9 +1237,48 @@ i32 rhi_allocate_descriptor(rhi_descriptor_heap* heap)
     return -1;
 }
 
+void rhi_push_descriptor_heap_image(rhi_descriptor_heap* heap, rhi_image* image, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = image->image_layout;
+    image_info.imageView = image->image_view;
+    image_info.sampler = VK_NULL_HANDLE;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    write.dstArrayElement = binding;
+    write.dstBinding = 0;
+    write.dstSet = heap->set;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
+void rhi_push_descriptor_heap_sampler(rhi_descriptor_heap* heap, rhi_sampler* sampler, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_info.imageView = VK_NULL_HANDLE;
+    image_info.sampler = sampler->sampler;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    write.dstArrayElement = binding;
+    write.dstBinding = 0;
+    write.dstSet = heap->set;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
 void rhi_free_descriptor(rhi_descriptor_heap* heap, u32 descriptor)
 {
     heap->heap_handle[descriptor] = 0;
+    heap->used--;
 }
 
 void rhi_free_descriptor_heap(rhi_descriptor_heap* heap)
@@ -1265,7 +1408,12 @@ void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
 
 void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding)
 {
-    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0, 1, &heap->set, 0, NULL);
+    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, binding, 1, &heap->set, 0, NULL);
+}
+
+void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_set* set, i32 binding)
+{
+    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, binding, 1, &set->set, 0, NULL);
 }
 
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)

@@ -56,6 +56,7 @@ call %VULKAN_SDK%/bin/glslc.exe -g -O %rootDir%/shaders/triangle_frag.frag -o tr
 popd
 
 Xcopy shaders build\shaders\ /y
+Xcopy assets build\assets\ /y
 
 echo.
 echo Build finished.
