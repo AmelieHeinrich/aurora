@@ -8,6 +8,7 @@
 #include <volk.h>
 
 typedef void (*aurora_resize_event)(u32, u32);
+typedef void (*aurora_job_function)();
 
 typedef struct aurora_platform_layer aurora_platform_layer;
 struct aurora_platform_layer

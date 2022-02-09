@@ -57,6 +57,9 @@ struct vk_state
     rhi_command_buf swap_chain_cmd_bufs[FRAMES_IN_FLIGHT];
 
     VmaAllocator allocator;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSetLayout image_heap_layout;
+    VkDescriptorSetLayout sampler_heap_layout;
 };
 
 vk_state state;
@@ -482,6 +485,44 @@ void rhi_make_allocator()
     assert(result == VK_SUCCESS);
 }
 
+void rhi_make_descriptors()
+{
+    VkDescriptorPoolSize sizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024 }
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {0};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.pPoolSizes = sizes;
+    pool_info.poolSizeCount = 4;
+    pool_info.maxSets = 16;
+
+    VkResult res = vkCreateDescriptorPool(state.device, &pool_info, NULL, &state.descriptor_pool);
+    vk_check(res);
+
+    VkDescriptorSetLayoutBinding binding = {0};
+    binding.binding = 0;
+    binding.descriptorCount = 1024;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    binding.stageFlags = VK_SHADER_STAGE_ALL;
+
+    VkDescriptorSetLayoutCreateInfo set_layout_info = {0};
+    set_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    set_layout_info.bindingCount = 1;
+    set_layout_info.pBindings = &binding;
+    
+    res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &state.image_heap_layout);
+    vk_check(res);
+
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+
+    res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &state.sampler_heap_layout);
+    vk_check(res);
+}
+
 void rhi_init()
 {
     memset(&state, 0, sizeof(vk_state));
@@ -495,6 +536,7 @@ void rhi_init()
     rhi_make_sync();
     rhi_make_cmd();
     rhi_make_allocator();
+    rhi_make_descriptors();
 }
 
 void rhi_begin()
@@ -556,6 +598,9 @@ void rhi_shutdown()
 {
     vkDeviceWaitIdle(state.device);
 
+    vkDestroyDescriptorSetLayout(state.device, state.sampler_heap_layout, NULL);
+    vkDestroyDescriptorSetLayout(state.device, state.image_heap_layout, NULL);
+    vkDestroyDescriptorPool(state.device, state.descriptor_pool, NULL);
     vmaDestroyAllocator(state.allocator);
 
     for (u32 i = 0; i < FRAMES_IN_FLIGHT; i++)
@@ -606,6 +651,31 @@ rhi_image* rhi_get_swapchain_image()
 rhi_command_buf* rhi_get_swapchain_cmd_buf()
 {
     return &state.swap_chain_cmd_bufs[state.image_index];
+}
+
+void rhi_init_descriptor_set_layout(rhi_descriptor_set_layout* layout)
+{
+    VkDescriptorSetLayoutBinding bindings[32] = {0};
+    for (i32 i = 0; i < layout->descriptor_count; i++)
+    {
+        bindings[i].binding = i;
+        bindings[i].descriptorCount = 1;
+        bindings[i].descriptorType = (VkDescriptorType)layout->descriptors[i];
+        bindings[i].stageFlags = VK_SHADER_STAGE_ALL;
+    }
+
+    VkDescriptorSetLayoutCreateInfo set_layout_info = {0};
+    set_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    set_layout_info.pBindings = bindings;
+    set_layout_info.bindingCount = layout->descriptor_count;
+    
+    VkResult res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &layout->layout);
+    vk_check(res);
+}
+
+void rhi_free_descriptor_set_layout(rhi_descriptor_set_layout* layout)
+{
+    vkDestroyDescriptorSetLayout(state.device, layout->layout, NULL);
 }
 
 void rhi_load_shader(rhi_shader_module* shader, const char* path)
@@ -795,6 +865,15 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = {0};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    if (descriptor->set_layout_count > 0)
+    {
+        VkDescriptorSetLayout layouts[16];
+        for (i32 i = 0; i < descriptor->set_layout_count; i++)
+            layouts[i] = descriptor->set_layouts[i].layout;
+
+        pipeline_layout_info.setLayoutCount = descriptor->set_layout_count;
+        pipeline_layout_info.pSetLayouts = layouts;
+    }
 
     VkResult res = vkCreatePipelineLayout(state.device, &pipeline_layout_info, NULL, &pipeline->pipeline_layout);
     vk_check(res);
@@ -1021,6 +1100,50 @@ void rhi_resize_image(rhi_image* image, i32 width, i32 height)
     rhi_allocate_image(image, image->width, image->height, image->format, image->usage);
 }
 
+void rhi_init_descriptor_heap(rhi_descriptor_heap* heap, u32 type, u32 size)
+{
+    memset(heap, 0, sizeof(rhi_descriptor_heap));
+    heap->heap_handle = aurora_platform_layer_halloc(sizeof(b32) * size);
+    memset(heap->heap_handle, 0, sizeof(b32) * size);
+    heap->type = type;
+    heap->used = 0;
+    heap->size = size;
+
+    VkDescriptorSetAllocateInfo descriptor_set_info = {0};
+    descriptor_set_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptor_set_info.descriptorSetCount = 1;
+    descriptor_set_info.descriptorPool = state.descriptor_pool;
+    descriptor_set_info.pSetLayouts = type == DESCRIPTOR_HEAP_IMAGE ? &state.image_heap_layout : &state.sampler_heap_layout;
+
+    VkResult res = vkAllocateDescriptorSets(state.device, &descriptor_set_info, &heap->set);
+    vk_check(res);
+}
+
+i32 rhi_allocate_descriptor(rhi_descriptor_heap* heap)
+{
+    for (i32 i = 0; i < heap->size; i++)
+    {
+        if (heap->heap_handle[i] == 0)
+        {
+            heap->heap_handle[i] = 1;
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void rhi_free_descriptor(rhi_descriptor_heap* heap, u32 descriptor)
+{
+    heap->heap_handle[descriptor] = 0;
+}
+
+void rhi_free_descriptor_heap(rhi_descriptor_heap* heap)
+{
+    vkFreeDescriptorSets(state.device, state.descriptor_pool, 1, &heap->set);
+    free(heap->heap_handle);
+}
+
 void rhi_init_cmd_buf(rhi_command_buf* buf, u32 command_buffer_type)
 {
     buf->command_buffer_type = command_buffer_type;
@@ -1138,6 +1261,11 @@ void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
 void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer)
 {
     vkCmdBindIndexBuffer(buf->buf, buffer->buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
+void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding)
+{
+    vkCmdBindDescriptorSets(buf->buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0, 1, &heap->set, 0, NULL);
 }
 
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)
