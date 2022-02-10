@@ -118,6 +118,8 @@ struct rhi_pipeline_descriptor
 
     rhi_descriptor_set_layout* set_layouts[16];
     u32 set_layout_count;
+
+    u32 push_constant_size;
 };
 
 typedef struct rhi_pipeline rhi_pipeline;
@@ -226,6 +228,7 @@ void rhi_cmd_set_vertex_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_index_buffer(rhi_command_buf* buf, rhi_buffer* buffer);
 void rhi_cmd_set_descriptor_heap(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_heap* heap, i32 binding);
 void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rhi_descriptor_set* set, i32 binding);
+void rhi_cmd_set_push_constants(rhi_command_buf* buf, rhi_pipeline* pipeline, void* data, u32 size);
 void rhi_cmd_draw(rhi_command_buf* buf, u32 count);
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count);
 void rhi_cmd_draw_meshlets(rhi_command_buf* buf, u32 count);

@@ -977,6 +977,16 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
         pipeline_layout_info.setLayoutCount = descriptor->set_layout_count;
         pipeline_layout_info.pSetLayouts = layouts;
     }
+    if (descriptor->push_constant_size > 0)
+    {
+        VkPushConstantRange range = {0};
+        range.offset = 0;
+        range.size = descriptor->push_constant_size;
+        range.stageFlags = VK_SHADER_STAGE_ALL;
+
+        pipeline_layout_info.pushConstantRangeCount = 1;
+        pipeline_layout_info.pPushConstantRanges = &range;
+    }
 
     VkResult res = vkCreatePipelineLayout(state.device, &pipeline_layout_info, NULL, &pipeline->pipeline_layout);
     vk_check(res);
@@ -1030,6 +1040,16 @@ void rhi_init_compute_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* 
 
         pipeline_layout_info.setLayoutCount = descriptor->set_layout_count;
         pipeline_layout_info.pSetLayouts = layouts;
+    }
+    if (descriptor->push_constant_size > 0)
+    {
+        VkPushConstantRange range = {0};
+        range.offset = 0;
+        range.size = descriptor->push_constant_size;
+        range.stageFlags = VK_SHADER_STAGE_ALL;
+
+        pipeline_layout_info.pushConstantRangeCount = 1;
+        pipeline_layout_info.pPushConstantRanges = &range;
     }
 
     VkResult res = vkCreatePipelineLayout(state.device, &pipeline_layout_info, NULL, &pipeline->pipeline_layout);
@@ -1125,6 +1145,9 @@ void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format
     view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
+    vk_check(res);
 }
 
 void rhi_load_image(rhi_image* image, const char* path)
@@ -1231,8 +1254,13 @@ void rhi_free_image(rhi_image* image)
 
 void rhi_resize_image(rhi_image* image, i32 width, i32 height)
 {
-    rhi_free_image(image);
-    rhi_allocate_image(image, image->width, image->height, image->format, image->usage);
+    if (image->image != VK_NULL_HANDLE)
+    {
+        image->width = width;
+        image->height = height;
+        rhi_free_image(image);
+        rhi_allocate_image(image, image->width, image->height, image->format, image->usage);
+    }
 }
 
 void rhi_init_descriptor_heap(rhi_descriptor_heap* heap, u32 type, u32 size)
@@ -1448,6 +1476,11 @@ void rhi_cmd_set_descriptor_set(rhi_command_buf* buf, rhi_pipeline* pipeline, rh
     vkCmdBindDescriptorSets(buf->buf, pipeline->bind_point, pipeline->pipeline_layout, binding, 1, &set->set, 0, NULL);
 }
 
+void rhi_cmd_set_push_constants(rhi_command_buf* buf, rhi_pipeline* pipeline, void* data, u32 size)
+{
+    vkCmdPushConstants(buf->buf, pipeline->pipeline_layout, VK_SHADER_STAGE_ALL, 0, size, data);
+}
+
 void rhi_cmd_draw_indexed(rhi_command_buf* buf, u32 count)
 {
     vkCmdDrawIndexed(buf->buf, count, 1, 0, 0, 0);
@@ -1500,7 +1533,7 @@ void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info)
         VkRenderingAttachmentInfoKHR color_attachment_info = { 0 };
         color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
         color_attachment_info.imageView = image->image_view;
-        color_attachment_info.imageLayout = image->image_layout;
+        color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
         color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         color_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1520,7 +1553,7 @@ void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info)
         VkRenderingAttachmentInfoKHR depth_attachment = { 0 };
         depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
         depth_attachment.imageView = image->image_view;
-        depth_attachment.imageLayout = image->image_layout;
+        depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         depth_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

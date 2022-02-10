@@ -12,6 +12,8 @@ struct aurora_win32_data
 {
 	HMODULE application_hmodule;
 	HWND hwnd;
+	f64 timer_start;
+	f64 timer_frequency;
 };
 
 internal aurora_win32_data windows;
@@ -48,6 +50,8 @@ void aurora_platform_layer_init()
 	
 	GetModuleFileName(windows.application_hmodule, platform.executable_directory, 512);
     PathRemoveFileSpecA(platform.executable_directory);
+
+	aurora_platform_init_timer();
 }
 
 void aurora_platform_layer_free()
@@ -140,4 +144,50 @@ void aurora_platform_create_vk_surface(VkInstance instance, VkSurfaceKHR* out)
 	surface_create_info.hwnd = windows.hwnd;
 	
 	vkCreateWin32SurfaceKHR(instance, &surface_create_info, NULL, out);
+}
+
+void aurora_platform_init_timer()
+{
+	LARGE_INTEGER large;
+
+	QueryPerformanceCounter(&large);
+	windows.timer_start = (f64)large.QuadPart;
+
+	QueryPerformanceFrequency(&large);
+	windows.timer_frequency = (f64)large.QuadPart;
+}
+
+f32 aurora_platform_get_time()
+{
+	LARGE_INTEGER large_int;
+	QueryPerformanceCounter(&large_int);
+
+	i64 now = large_int.QuadPart;
+	i64 time = now - windows.timer_start;
+
+	return (f32)((f64)time / windows.timer_frequency);
+}
+
+b32 aurora_platform_key_pressed(u32 key)
+{
+	return (b32)(GetAsyncKeyState((i32)key) & 0x8000);
+}
+
+b32 aurora_platform_mouse_button_pressed(u32 button)
+{
+	return (b32)(GetAsyncKeyState((i32)button) & 0x8000);
+}
+
+f32 aurora_platform_get_mouse_x()
+{
+	POINT p;
+	GetCursorPos(&p);
+	return p.x;
+}
+
+f32 aurora_platform_get_mouse_y()
+{
+	POINT p;
+	GetCursorPos(&p);
+	return p.y;
 }

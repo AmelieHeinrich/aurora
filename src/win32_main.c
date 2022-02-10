@@ -1,7 +1,12 @@
 #include "platform_layer.h"
 #include "rhi.h"
+#include "camera.h"
 
 #include <stdio.h>
+
+global fps_camera camera;
+global rhi_image depth_buffer;
+global f64 last_frame;
 
 typedef struct bindless_material bindless_material;
 struct bindless_material
@@ -14,6 +19,8 @@ void game_resize(u32 width, u32 height)
 {
 	rhi_wait_idle();
 	rhi_resize();
+	fps_camera_resize(&camera, width, height);
+	rhi_resize_image(&depth_buffer, width, height);
 }
 
 global f32 vertices[] = {
@@ -30,6 +37,8 @@ global u32 indices[] = {
 
 int main()
 {
+	fps_camera_init(&camera);
+
 	aurora_platform_layer_init();
 	platform.width = 1280;
 	platform.height = 720;
@@ -54,6 +63,8 @@ int main()
 	bindless_material triangle_bindless;
 
 	{
+		rhi_allocate_image(&depth_buffer, platform.width, platform.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
 		material_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
 		material_set_layout.descriptor_count = 1;
 		material_set_layout.binding = 2;
@@ -78,7 +89,8 @@ int main()
 		memset(&descriptor, 0, sizeof(descriptor));
 		descriptor.color_attachment_count = 1;
 		descriptor.color_attachments_formats[0] = VK_FORMAT_B8G8R8A8_UNORM;
-		descriptor.cull_mode = VK_CULL_MODE_NONE;
+		descriptor.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
+		descriptor.cull_mode = VK_CULL_MODE_BACK_BIT;
 		descriptor.depth_op = VK_COMPARE_OP_LESS;
 		descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
 		descriptor.polygon_mode = VK_POLYGON_MODE_FILL;
@@ -90,6 +102,7 @@ int main()
 		descriptor.set_layouts[0] = rhi_get_image_heap_set_layout();
 		descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
 		descriptor.set_layouts[2] = &material_set_layout;
+		descriptor.push_constant_size = sizeof(hmm_mat4);
 	
 		rhi_init_graphics_pipeline(&triangle_pipeline, &descriptor);
 		rhi_allocate_buffer(&triangle_vertex_buffer, sizeof(vertices), BUFFER_VERTEX);
@@ -108,6 +121,10 @@ int main()
 
 	while (!platform.quit)
 	{
+		f32 time = aurora_platform_get_time();
+		f32 dt = time - last_frame;
+		last_frame = time;
+
 		rhi_begin();
 
 		rhi_image* swap_chain_image = rhi_get_swapchain_image();
@@ -118,20 +135,23 @@ int main()
 		begin.g = 0.0f;
 		begin.b = 0.0f;
 		begin.a = 1.0f;
-		begin.has_depth = 0;
+		begin.has_depth = 1;
 		begin.width = platform.width;
 		begin.height = platform.height;
 		begin.images[0] = swap_chain_image;
-		begin.image_count = 1;
+		begin.images[1] = &depth_buffer;
+		begin.image_count = 2;
+
+		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+		rhi_cmd_img_transition_layout(cmd_buf, &depth_buffer, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, 0);
 
 		rhi_cmd_start_render(cmd_buf, begin);
-		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-		
 		rhi_cmd_set_viewport(cmd_buf, platform.width, platform.height);
 		rhi_cmd_set_pipeline(cmd_buf, &triangle_pipeline);
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &image_heap, 0);
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
 		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);
+		rhi_cmd_set_push_constants(cmd_buf, &triangle_pipeline, &camera.view_projection, sizeof(camera.view_projection));
 		rhi_cmd_set_vertex_buffer(cmd_buf, &triangle_vertex_buffer);
 		rhi_cmd_set_index_buffer(cmd_buf, &triangle_index_buffer);
 		rhi_cmd_draw_indexed(cmd_buf, 6);
@@ -141,6 +161,9 @@ int main()
 
 		rhi_end();
 		rhi_present();
+
+		fps_camera_input(&camera, dt);
+		fps_camera_update(&camera, dt);
 
 		aurora_platform_update_window();
 	}
@@ -155,6 +178,7 @@ int main()
 	rhi_free_image(&triangle_texture);
 	rhi_free_sampler(&triangle_sampler);
 	rhi_free_descriptor_set_layout(&material_set_layout);
+	rhi_free_image(&depth_buffer);
 
 	rhi_free_descriptor_heap(&image_heap);
 	rhi_free_descriptor_heap(&sampler_heap);

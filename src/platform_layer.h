@@ -33,5 +33,11 @@ void  aurora_platform_open_window(const char* title);
 void  aurora_platform_update_window();
 void  aurora_platform_free_window();
 void  aurora_platform_create_vk_surface(VkInstance instance, VkSurfaceKHR* out);
+void  aurora_platform_init_timer();
+f32   aurora_platform_get_time();
+b32   aurora_platform_key_pressed(u32 key);
+b32   aurora_platform_mouse_button_pressed(u32 button);
+f32   aurora_platform_get_mouse_x();
+f32   aurora_platform_get_mouse_y();
 
 #endif //PLATFORM_LAYER_H
