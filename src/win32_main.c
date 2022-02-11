@@ -49,8 +49,8 @@ int main()
 
 	rhi_descriptor_heap image_heap;
 	rhi_descriptor_heap sampler_heap;
-	rhi_init_descriptor_heap(&image_heap, DESCRIPTOR_HEAP_IMAGE, 64);
-	rhi_init_descriptor_heap(&sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 8);
+	rhi_init_descriptor_heap(&image_heap, DESCRIPTOR_HEAP_IMAGE, 512);
+	rhi_init_descriptor_heap(&sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 512);
 
 	rhi_pipeline triangle_pipeline;
 	rhi_descriptor_set_layout material_set_layout;

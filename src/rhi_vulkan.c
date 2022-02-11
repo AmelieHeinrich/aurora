@@ -518,7 +518,7 @@ void rhi_make_descriptors()
 
     VkDescriptorSetLayoutBinding binding = {0};
     binding.binding = 0;
-    binding.descriptorCount = 1024;
+    binding.descriptorCount = 512;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     binding.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -545,12 +545,12 @@ void rhi_make_descriptors()
 
     state.rhi_image_heap.binding = 0;
     state.rhi_image_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    state.rhi_image_heap.descriptor_count = 1024;
+    state.rhi_image_heap.descriptor_count = 512;
     state.rhi_image_heap.layout = state.image_heap_layout;
 
     state.rhi_sampler_heap.binding = 1;
     state.rhi_sampler_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLER;
-    state.rhi_sampler_heap.descriptor_count = 1024;
+    state.rhi_sampler_heap.descriptor_count = 512;
     state.rhi_sampler_heap.layout = state.sampler_heap_layout;
 }
 
