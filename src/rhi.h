@@ -197,9 +197,9 @@ void rhi_init_compute_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor* 
 void rhi_free_pipeline(rhi_pipeline* pipeline);
 
 // Buffer
-void rhi_allocate_buffer(rhi_buffer* buffer, u32 size, u32 buffer_usage);
+void rhi_allocate_buffer(rhi_buffer* buffer, u64 size, u32 buffer_usage);
 void rhi_free_buffer(rhi_buffer* buffer);
-void rhi_upload_buffer(rhi_buffer* buffer, void* data, u32 size);
+void rhi_upload_buffer(rhi_buffer* buffer, void* data, u64 size);
 
 // Image
 void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format, u32 usage);

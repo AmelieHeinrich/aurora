@@ -25,6 +25,7 @@ void fps_camera_init(fps_camera* camera)
     camera->up.Y = -1.0f;
     camera->front.Z = -1.0f;
     camera->worldup.Y = 1.0f;
+    camera->position.Z = 1.0f;
     camera->yaw = CAMERA_DEFAULT_YAW;
     camera->pitch = CAMERA_DEFAULT_PITCH;
     camera->zoom = CAMERA_DEFAULT_ZOOM;

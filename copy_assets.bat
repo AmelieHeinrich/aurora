@@ -1,0 +1,1 @@
+Xcopy assets build\assets\ /y

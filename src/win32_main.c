@@ -1,6 +1,7 @@
 #include "platform_layer.h"
 #include "rhi.h"
 #include "camera.h"
+#include "mesh.h"
 
 #include <stdio.h>
 
@@ -11,6 +12,7 @@ global f64 last_frame;
 typedef struct bindless_material bindless_material;
 struct bindless_material
 {
+	hmm_mat4 model_matrix;
 	u32 texture_index;
 	u32 sampler_index;
 };	
@@ -22,18 +24,6 @@ void game_resize(u32 width, u32 height)
 	fps_camera_resize(&camera, width, height);
 	rhi_resize_image(&depth_buffer, width, height);
 }
-
-global f32 vertices[] = {
-	-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-	 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-	 0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-	-0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f
-};
-
-global u32 indices[] = {
-	0, 1, 2,
-	2, 3, 0
-};
 
 int main()
 {
@@ -57,8 +47,7 @@ int main()
 	rhi_descriptor_set material_set;
 	rhi_image triangle_texture;
 	rhi_sampler triangle_sampler;
-	rhi_buffer triangle_vertex_buffer;
-	rhi_buffer triangle_index_buffer;
+	mesh suzanne;
 	rhi_buffer triangle_material;
 	bindless_material triangle_bindless;
 
@@ -76,6 +65,9 @@ int main()
 		rhi_load_image(&triangle_texture, "assets/texture.jpg");
 		triangle_bindless.texture_index = rhi_find_available_descriptor(&image_heap);
 		triangle_bindless.sampler_index = rhi_find_available_descriptor(&sampler_heap);
+		triangle_bindless.model_matrix = HMM_Mat4d(1.0f);
+		triangle_bindless.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
+		triangle_bindless.model_matrix = HMM_MultiplyMat4(triangle_bindless.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
 
 		rhi_push_descriptor_heap_image(&image_heap, &triangle_texture, triangle_bindless.texture_index);
 		rhi_push_descriptor_heap_sampler(&sampler_heap, &triangle_sampler, triangle_bindless.sampler_index);
@@ -103,12 +95,9 @@ int main()
 		descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
 		descriptor.set_layouts[2] = &material_set_layout;
 		descriptor.push_constant_size = sizeof(hmm_mat4);
-	
+
 		rhi_init_graphics_pipeline(&triangle_pipeline, &descriptor);
-		rhi_allocate_buffer(&triangle_vertex_buffer, sizeof(vertices), BUFFER_VERTEX);
-		rhi_upload_buffer(&triangle_vertex_buffer, vertices, sizeof(vertices));
-		rhi_allocate_buffer(&triangle_index_buffer, sizeof(indices), BUFFER_INDEX);
-		rhi_upload_buffer(&triangle_index_buffer, indices, sizeof(indices));
+		mesh_load(&suzanne, "assets/Sponza.gltf");
 		rhi_allocate_buffer(&triangle_material, sizeof(bindless_material), BUFFER_UNIFORM);
 		rhi_upload_buffer(&triangle_material, &triangle_bindless, sizeof(bindless_material));
 
@@ -152,9 +141,12 @@ int main()
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
 		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);
 		rhi_cmd_set_push_constants(cmd_buf, &triangle_pipeline, &camera.view_projection, sizeof(camera.view_projection));
-		rhi_cmd_set_vertex_buffer(cmd_buf, &triangle_vertex_buffer);
-		rhi_cmd_set_index_buffer(cmd_buf, &triangle_index_buffer);
-		rhi_cmd_draw_indexed(cmd_buf, 6);
+		for (i32 i = 0; i < suzanne.submesh_count; i++)
+		{
+			rhi_cmd_set_vertex_buffer(cmd_buf, &suzanne.submeshes[i].vertex_buffer);
+			rhi_cmd_set_index_buffer(cmd_buf, &suzanne.submeshes[i].index_buffer);
+			rhi_cmd_draw_indexed(cmd_buf, suzanne.submeshes[i].index_count);
+		}
 		
 		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
 		rhi_cmd_end_render(cmd_buf);
@@ -173,8 +165,7 @@ int main()
 	rhi_free_pipeline(&triangle_pipeline);
 	rhi_free_descriptor_set(&material_set);
 	rhi_free_buffer(&triangle_material);
-	rhi_free_buffer(&triangle_index_buffer);
-	rhi_free_buffer(&triangle_vertex_buffer);
+	mesh_free(&suzanne);
 	rhi_free_image(&triangle_texture);
 	rhi_free_sampler(&triangle_sampler);
 	rhi_free_descriptor_set_layout(&material_set_layout);

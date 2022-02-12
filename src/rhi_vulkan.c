@@ -1072,7 +1072,7 @@ void rhi_free_pipeline(rhi_pipeline* pipeline)
     vkDestroyPipelineLayout(state.device, pipeline->pipeline_layout, NULL);
 }
 
-void rhi_allocate_buffer(rhi_buffer* buffer, u32 size, u32 buffer_usage)
+void rhi_allocate_buffer(rhi_buffer* buffer, u64 size, u32 buffer_usage)
 {
     VkBufferCreateInfo buffer_create_info = {0};
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1092,10 +1092,10 @@ void rhi_free_buffer(rhi_buffer* buffer)
     vmaDestroyBuffer(state.allocator, buffer->buffer, buffer->allocation);
 }
 
-void rhi_upload_buffer(rhi_buffer* buffer, void* data, u32 size)
+void rhi_upload_buffer(rhi_buffer* buffer, void* data, u64 size)
 {
     void* buf;
-    vmaMapMemory(state.allocator, buffer->allocation, &buf);
+    vk_check(vmaMapMemory(state.allocator, buffer->allocation, &buf));
     memcpy(buf, data, size);
     vmaUnmapMemory(state.allocator, buffer->allocation);
 }

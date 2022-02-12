@@ -16,6 +16,8 @@ typedef i32 b32;
 #define global static
 #define internal static
 
+#define OFFSET_PTR_BYTES(type, ptr, offset) ((type*)((u8*)ptr + (offset)))
+
 #define KEY_SPACE 32
 #define KEY_COMMA 188
 #define KEY_MINUS 189
