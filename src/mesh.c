@@ -57,18 +57,20 @@ void* cgltf_get_accessor_data(cgltf_accessor* accessor, u32* component_size, u32
     return OFFSET_PTR_BYTES(void, view->buffer->data, view->offset);
 }
 
-void cgltf_process_primitive(cgltf_primitive* primitive, u32 primitive_index, submesh* sm, mesh* m)
+void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_index, mesh* m)
 {
-    if (primitive->type != cgltf_primitive_type_triangles)
+    primitive* pri = &m->primitives[(*primitive_index)++];
+
+    if (cgltf_primitive->type != cgltf_primitive_type_triangles)
         return;
 
     cgltf_attribute* position_attribute = 0;
     cgltf_attribute* texcoord_attribute = 0;
     cgltf_attribute* normal_attribute = 0;
 
-    for (i32 attribute_index = 0; attribute_index < primitive->attributes_count; attribute_index++)
+    for (i32 attribute_index = 0; attribute_index < cgltf_primitive->attributes_count; attribute_index++)
     {
-        cgltf_attribute* attribute = &primitive->attributes[attribute_index];
+        cgltf_attribute* attribute = &cgltf_primitive->attributes[attribute_index];
 
         if (strcmp(attribute->name, "POSITION") == 0) position_attribute = attribute;
         if (strcmp(attribute->name, "TEXCOORD_0") == 0) texcoord_attribute = attribute;
@@ -129,61 +131,48 @@ void cgltf_process_primitive(cgltf_primitive* primitive, u32 primitive_index, su
         }
     }
 
-    u32 index_count = (u32)primitive->indices->count;
-    u32* indices = (u32*)malloc(index_count * sizeof(u32));
-    memset(indices, 0, sizeof(indices));
+    pri->index_count = (u32)cgltf_primitive->indices->count;
+    u32 index_size = pri->index_count * sizeof(u32);
+    u32* indices = (u32*)malloc(index_size);
+    memset(indices, 0, index_size);
 
     {
-        u32 component_size, component_count;
-        void* src = cgltf_get_accessor_data(primitive->indices, &component_size, &component_count);
-        assert(component_size == 4 || component_size == 2);
-
-        if (component_size == 2)
-        { // u16
-            u16* ptr = (u16*)src;
-            for (u32 index_index = 0; index_index < index_count; index_index++)
-                indices[index_index] = ptr[index_index];
-        }
-        else
-        { // u32
-            u32* ptr = (u32*)src;
-            for (u32 index_index = 0; index_index < index_count; index_index++)
-                indices[index_index] = ptr[index_index];
+        if (cgltf_primitive->indices != NULL)
+        {
+            for (u32 k = 0; k < (u32)cgltf_primitive->indices->count; k++)
+                indices[k] = (u32)(cgltf_accessor_read_index(cgltf_primitive->indices, k));
         }
     }
 
-    rhi_allocate_buffer(&sm->vertex_buffer, vertices_size, BUFFER_VERTEX);
-    rhi_upload_buffer(&sm->vertex_buffer, vertices, vertices_size);
+    rhi_allocate_buffer(&pri->vertex_buffer, vertices_size, BUFFER_VERTEX);
+    rhi_upload_buffer(&pri->vertex_buffer, vertices, vertices_size);
 
-    rhi_allocate_buffer(&sm->index_buffer, index_count * sizeof(u32), BUFFER_INDEX);
-    rhi_upload_buffer(&sm->index_buffer, indices, index_count * sizeof(u32));
+    rhi_allocate_buffer(&pri->index_buffer, index_size, BUFFER_INDEX);
+    rhi_upload_buffer(&pri->index_buffer, indices, index_size);
 
     // TODO: Meshlets
 
-    sm->vertex_count = vertex_count;
-    sm->index_count = index_count;
-    sm->triangle_count = index_count / 3;
-    sm->vertex_size = vertices_size;
-    sm->index_size = index_count * sizeof(u32);
+    pri->vertex_count = vertex_count;
+    pri->triangle_count = pri->index_count / 3;
+    pri->vertex_size = vertices_size;
+    pri->index_size = index_size;
 
-    m->total_vertex_count += sm->vertex_count;
-    m->total_index_count += sm->index_count;
-    m->total_triangle_count += sm->triangle_count;
+    m->total_vertex_count += pri->vertex_count;
+    m->total_index_count += pri->index_count;
+    m->total_triangle_count += pri->triangle_count;
 
     free(indices);
     free(vertices);
-
-    primitive_index++;
 }
 
-void cgltf_process_node(cgltf_node* node, u32 primitive_index, mesh* m)
+void cgltf_process_node(cgltf_node* node, u32* primitive_index, mesh* m)
 {
     if (node->mesh)
     {
         for (i32 p = 0; p < node->mesh->primitives_count; p++)
         {
-            cgltf_process_primitive(&node->mesh->primitives[p], primitive_index, &m->submeshes[p], m);
-            m->submesh_count++;
+            cgltf_process_primitive(&node->mesh->primitives[p], primitive_index, m);
+            m->primitive_count++;
         }
     }
 
@@ -194,7 +183,6 @@ void cgltf_process_node(cgltf_node* node, u32 primitive_index, mesh* m)
 void mesh_load(mesh* out, const char* path)
 {
     memset(out, 0, sizeof(mesh));
-    memset(out->submeshes, 0, sizeof(out->submeshes));
 
     cgltf_options options;
     memset(&options, 0, sizeof(options));
@@ -206,16 +194,16 @@ void mesh_load(mesh* out, const char* path)
     
     u32 pi = 0;
     for (i32 ni = 0; ni < scene->nodes_count; ni++)
-        cgltf_process_node(scene->nodes[ni], pi, out);
+        cgltf_process_node(scene->nodes[ni], &pi, out);
 
     cgltf_free(data);
 }
 
 void mesh_free(mesh* m)
 {
-    for (i32 i = 0; i < m->submesh_count; i++)
+    for (i32 i = 0; i < m->primitive_count; i++)
     {
-        rhi_free_buffer(&m->submeshes[i].index_buffer);
-        rhi_free_buffer(&m->submeshes[i].vertex_buffer);
+        rhi_free_buffer(&m->primitives[i].index_buffer);
+        rhi_free_buffer(&m->primitives[i].vertex_buffer);
     }
 }

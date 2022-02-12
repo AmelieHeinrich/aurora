@@ -5,7 +5,7 @@
 #include "rhi.h"
 #include "HandmadeMath.h"
 
-#define MAX_SUBMESHES 128
+#define MAX_PRIMITIVES 128
 #define MAX_MESHLET_VERTICES 64
 #define MAX_MESHLET_INDICES 372
 #define MAX_MESHLET_TRIANGLES 124
@@ -27,8 +27,8 @@ struct meshlet
     u32 triangle_count;
 };
 
-typedef struct submesh submesh;
-struct submesh
+typedef struct primitive primitive;
+struct primitive
 {
     rhi_buffer vertex_buffer;
     rhi_buffer index_buffer;
@@ -46,8 +46,8 @@ struct submesh
 typedef struct mesh mesh;
 struct mesh
 {
-    submesh submeshes[MAX_SUBMESHES];
-    i32 submesh_count;
+    primitive primitives[MAX_PRIMITIVES];
+    i32 primitive_count;
 
     u32 total_vertex_count;
     u32 total_index_count;

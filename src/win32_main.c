@@ -141,11 +141,11 @@ int main()
 		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
 		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);
 		rhi_cmd_set_push_constants(cmd_buf, &triangle_pipeline, &camera.view_projection, sizeof(camera.view_projection));
-		for (i32 i = 0; i < suzanne.submesh_count; i++)
+		for (i32 i = 0; i < suzanne.primitive_count; i++)
 		{
-			rhi_cmd_set_vertex_buffer(cmd_buf, &suzanne.submeshes[i].vertex_buffer);
-			rhi_cmd_set_index_buffer(cmd_buf, &suzanne.submeshes[i].index_buffer);
-			rhi_cmd_draw_indexed(cmd_buf, suzanne.submeshes[i].index_count);
+			rhi_cmd_set_vertex_buffer(cmd_buf, &suzanne.primitives[i].vertex_buffer);
+			rhi_cmd_set_index_buffer(cmd_buf, &suzanne.primitives[i].index_buffer);
+			rhi_cmd_draw_indexed(cmd_buf, suzanne.primitives[i].index_count);
 		}
 		
 		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);

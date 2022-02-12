@@ -20,7 +20,7 @@ layout (binding = 0, set = 2) uniform BindlessMaterial {
 
 void main() 
 {
-    fPosition = vPosition;
+    fPosition = vec3(camera * ModelMatrix * vec4(vPosition, 1.0));
     fTexcoords = vTexcoords;
     fNormals = vNormals;
     gl_Position = camera * ModelMatrix * vec4(vPosition, 1.0);
