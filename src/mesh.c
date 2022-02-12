@@ -3,8 +3,36 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define cgltf_call(call) do { cgltf_result _result = (call); assert(_result == cgltf_result_success); } while(0)
+
+internal rhi_descriptor_heap* s_image_heap;
+internal rhi_descriptor_set_layout s_descriptor_set_layout;
+
+void mesh_loader_init(i32 dset_layout_binding)
+{
+    s_descriptor_set_layout.binding = dset_layout_binding;
+    s_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
+    s_descriptor_set_layout.descriptor_count = 1;
+    
+    rhi_init_descriptor_set_layout(&s_descriptor_set_layout);
+}
+
+void mesh_loader_free()
+{
+    rhi_free_descriptor_set_layout(&s_descriptor_set_layout);
+}
+
+rhi_descriptor_set_layout* mesh_loader_get_descriptor_set_layout()
+{
+    return &s_descriptor_set_layout;
+}
+
+void mesh_loader_set_texture_heap(rhi_descriptor_heap* heap)
+{
+    s_image_heap = heap;
+}
 
 u32 cgltf_comp_size(cgltf_component_type type)
 {
@@ -152,6 +180,83 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
 
     // TODO: Meshlets
 
+    typedef struct temp_mat
+    {
+        i32 albedo_idx;
+        i32 normal_idx;
+        i32 mr_idx;
+        hmm_vec3 bc_factor;
+        f32 m_factor;
+        f32 r_factor;
+    } temp_mat;
+
+    // Load textures
+    {
+        if (cgltf_primitive->material)
+        {
+            pri->material_index = m->material_count;
+
+            {
+                char tx_path[512];
+                sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.base_color_texture.texture->image->uri);
+                printf("%s\n", tx_path);
+
+                rhi_load_image(&m->materials[pri->material_index].albedo, tx_path);
+                m->materials[pri->material_index].albedo_bindless_index = rhi_find_available_descriptor(s_image_heap);
+                rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].albedo, m->materials[pri->material_index].albedo_bindless_index);
+            
+                m->materials[pri->material_index].base_color_factor.X = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[0];
+                m->materials[pri->material_index].base_color_factor.Y = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[1];
+                m->materials[pri->material_index].base_color_factor.Z = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[2];
+            }
+
+            {
+                if (cgltf_primitive->material->normal_texture.texture)
+                {
+                    char tx_path[512];
+                    sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->normal_texture.texture->image->uri);
+                    printf("%s\n", tx_path);
+
+                    rhi_load_image(&m->materials[pri->material_index].normal, tx_path);
+                    m->materials[pri->material_index].normal_bindless_index = rhi_find_available_descriptor(s_image_heap);
+                    rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].normal, m->materials[pri->material_index].normal_bindless_index);
+                }
+            }
+
+            {
+                if (cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture)
+                {
+                    char tx_path[512];
+                    sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture->image->uri);
+                    printf("%s\n", tx_path);
+
+                    rhi_load_image(&m->materials[pri->material_index].metallic_roughness, tx_path);
+                    m->materials[pri->material_index].metallic_roughness_index = rhi_find_available_descriptor(s_image_heap);
+                    rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].metallic_roughness, m->materials[pri->material_index].metallic_roughness_index);
+                
+                    m->materials[pri->material_index].metallic_factor = cgltf_primitive->material->pbr_metallic_roughness.metallic_factor;
+                    m->materials[pri->material_index].roughness_factor = cgltf_primitive->material->pbr_metallic_roughness.roughness_factor;
+                }
+            }
+        
+            temp_mat temp;
+            temp.albedo_idx = m->materials[pri->material_index].albedo_bindless_index;
+            temp.normal_idx = m->materials[pri->material_index].normal_bindless_index;
+            temp.mr_idx = m->materials[pri->material_index].metallic_roughness_index;
+            temp.bc_factor = m->materials[pri->material_index].base_color_factor;
+            temp.m_factor = m->materials[pri->material_index].metallic_factor;
+            temp.r_factor = m->materials[pri->material_index].roughness_factor;
+
+            rhi_allocate_buffer(&m->materials[pri->material_index].material_buffer, sizeof(temp_mat), BUFFER_UNIFORM);
+            rhi_upload_buffer(&m->materials[pri->material_index].material_buffer, &temp, sizeof(temp_mat));
+
+            rhi_init_descriptor_set(&m->materials[pri->material_index].material_set, &s_descriptor_set_layout);
+            rhi_descriptor_set_write_buffer(&m->materials[pri->material_index].material_set, &m->materials[pri->material_index].material_buffer, sizeof(temp_mat), 0);
+
+            m->material_count++;
+        }
+    }
+
     pri->vertex_count = vertex_count;
     pri->triangle_count = pri->index_count / 3;
     pri->vertex_size = vertices_size;
@@ -192,6 +297,12 @@ void mesh_load(mesh* out, const char* path)
     cgltf_call(cgltf_load_buffers(&options, data, path));
     cgltf_scene* scene = data->scene;
     
+    const char* ch = "/";
+    char* ptr = strstr(path, ch);
+    ptr += sizeof(char);
+    strncpy(ptr, "", strlen(ptr));
+    out->directory = (char*)path;
+
     u32 pi = 0;
     for (i32 ni = 0; ni < scene->nodes_count; ni++)
         cgltf_process_node(scene->nodes[ni], &pi, out);
@@ -205,5 +316,17 @@ void mesh_free(mesh* m)
     {
         rhi_free_buffer(&m->primitives[i].index_buffer);
         rhi_free_buffer(&m->primitives[i].vertex_buffer);
+    }
+
+    for (i32 i = 0; i < m->material_count; i++)
+    {
+        if (m->materials[i].albedo.image != VK_NULL_HANDLE)
+            rhi_free_image(&m->materials[i].albedo);
+        if (m->materials[i].normal.image != VK_NULL_HANDLE)
+            rhi_free_image(&m->materials[i].normal);
+        if (m->materials[i].metallic_roughness.image != VK_NULL_HANDLE)
+            rhi_free_image(&m->materials[i].metallic_roughness);
+        rhi_free_buffer(&m->materials[i].material_buffer);
+        rhi_free_descriptor_set(&m->materials[i].material_set);
     }
 }

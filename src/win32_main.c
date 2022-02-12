@@ -9,12 +9,13 @@ global fps_camera camera;
 global rhi_image depth_buffer;
 global f64 last_frame;
 
-typedef struct bindless_material bindless_material;
-struct bindless_material
+typedef struct push_constants push_constants;
+struct push_constants
 {
 	hmm_mat4 model_matrix;
-	u32 texture_index;
-	u32 sampler_index;
+	hmm_mat4 camera_matrix;
+	hmm_vec3 camera_pos;
+	f32 pad;
 };	
 
 void game_resize(u32 width, u32 height)
@@ -27,57 +28,45 @@ void game_resize(u32 width, u32 height)
 
 int main()
 {
-	fps_camera_init(&camera);
-
 	aurora_platform_layer_init();
 	platform.width = 1280;
 	platform.height = 720;
 	platform.resize_event = game_resize;
 	aurora_platform_open_window("Aurora Window");
 
-	rhi_init();
-
 	rhi_descriptor_heap image_heap;
 	rhi_descriptor_heap sampler_heap;
-	rhi_init_descriptor_heap(&image_heap, DESCRIPTOR_HEAP_IMAGE, 512);
-	rhi_init_descriptor_heap(&sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 512);
+	rhi_pipeline mesh_pipeline;
+	rhi_sampler nearest_sampler;
+	mesh sponza;
+	push_constants matrices;
 
-	rhi_pipeline triangle_pipeline;
-	rhi_descriptor_set_layout material_set_layout;
-	rhi_descriptor_set material_set;
-	rhi_image triangle_texture;
-	rhi_sampler triangle_sampler;
-	mesh suzanne;
-	rhi_buffer triangle_material;
-	bindless_material triangle_bindless;
+	rhi_init();
+	rhi_init_descriptor_heap(&image_heap, DESCRIPTOR_HEAP_IMAGE, 1024);
+	rhi_init_descriptor_heap(&sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 16);
+	mesh_loader_set_texture_heap(&image_heap);
+	mesh_loader_init(2);
+	fps_camera_init(&camera);
 
 	{
 		rhi_allocate_image(&depth_buffer, platform.width, platform.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-		material_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
-		material_set_layout.descriptor_count = 1;
-		material_set_layout.binding = 2;
-		rhi_init_descriptor_set_layout(&material_set_layout);
+		nearest_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		nearest_sampler.filter = VK_FILTER_NEAREST;
+		rhi_init_sampler(&nearest_sampler);
+		rhi_push_descriptor_heap_sampler(&sampler_heap, &nearest_sampler, 0);
 
-		triangle_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		triangle_sampler.filter = VK_FILTER_NEAREST;
-		rhi_init_sampler(&triangle_sampler);
-		rhi_load_image(&triangle_texture, "assets/texture.jpg");
-		triangle_bindless.texture_index = rhi_find_available_descriptor(&image_heap);
-		triangle_bindless.sampler_index = rhi_find_available_descriptor(&sampler_heap);
-		triangle_bindless.model_matrix = HMM_Mat4d(1.0f);
-		triangle_bindless.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
-		triangle_bindless.model_matrix = HMM_MultiplyMat4(triangle_bindless.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
-
-		rhi_push_descriptor_heap_image(&image_heap, &triangle_texture, triangle_bindless.texture_index);
-		rhi_push_descriptor_heap_sampler(&sampler_heap, &triangle_sampler, triangle_bindless.sampler_index);
+		matrices.model_matrix = HMM_Mat4d(1.0f);
+		matrices.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
+		matrices.model_matrix = HMM_MultiplyMat4(matrices.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
 
 		rhi_shader_module vertex_shader;
 		rhi_shader_module pixel_shader;
+		rhi_pipeline_descriptor descriptor;
+
 		rhi_load_shader(&vertex_shader, "shaders/triangle_vert.vert.spv");
 		rhi_load_shader(&pixel_shader, "shaders/triangle_frag.frag.spv");
 
-		rhi_pipeline_descriptor descriptor;
 		memset(&descriptor, 0, sizeof(descriptor));
 		descriptor.color_attachment_count = 1;
 		descriptor.color_attachments_formats[0] = VK_FORMAT_B8G8R8A8_UNORM;
@@ -93,16 +82,11 @@ int main()
 		descriptor.set_layout_count = 3;
 		descriptor.set_layouts[0] = rhi_get_image_heap_set_layout();
 		descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
-		descriptor.set_layouts[2] = &material_set_layout;
-		descriptor.push_constant_size = sizeof(hmm_mat4);
+		descriptor.set_layouts[2] = mesh_loader_get_descriptor_set_layout();
+		descriptor.push_constant_size = sizeof(push_constants);
 
-		rhi_init_graphics_pipeline(&triangle_pipeline, &descriptor);
-		mesh_load(&suzanne, "assets/Sponza.gltf");
-		rhi_allocate_buffer(&triangle_material, sizeof(bindless_material), BUFFER_UNIFORM);
-		rhi_upload_buffer(&triangle_material, &triangle_bindless, sizeof(bindless_material));
-
-		rhi_init_descriptor_set(&material_set, &material_set_layout);
-		rhi_descriptor_set_write_buffer(&material_set, &triangle_material, sizeof(bindless_material), 0);
+		rhi_init_graphics_pipeline(&mesh_pipeline, &descriptor);
+		mesh_load(&sponza, "assets/Sponza.gltf");
 
 		rhi_free_shader(&pixel_shader);
 		rhi_free_shader(&vertex_shader);
@@ -120,9 +104,9 @@ int main()
 		rhi_command_buf* cmd_buf = rhi_get_swapchain_cmd_buf();
 
 		rhi_render_begin begin = {0};
-		begin.r = 0.0f;
-		begin.g = 0.0f;
-		begin.b = 0.0f;
+		begin.r = 0.1f;
+		begin.g = 0.1f;
+		begin.b = 0.1f;
 		begin.a = 1.0f;
 		begin.has_depth = 1;
 		begin.width = platform.width;
@@ -136,16 +120,18 @@ int main()
 
 		rhi_cmd_start_render(cmd_buf, begin);
 		rhi_cmd_set_viewport(cmd_buf, platform.width, platform.height);
-		rhi_cmd_set_pipeline(cmd_buf, &triangle_pipeline);
-		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &image_heap, 0);
-		rhi_cmd_set_descriptor_heap(cmd_buf, &triangle_pipeline, &sampler_heap, 1);
-		rhi_cmd_set_descriptor_set(cmd_buf, &triangle_pipeline, &material_set, 2);
-		rhi_cmd_set_push_constants(cmd_buf, &triangle_pipeline, &camera.view_projection, sizeof(camera.view_projection));
-		for (i32 i = 0; i < suzanne.primitive_count; i++)
+		rhi_cmd_set_pipeline(cmd_buf, &mesh_pipeline);
+		rhi_cmd_set_descriptor_heap(cmd_buf, &mesh_pipeline, &image_heap, 0);
+		rhi_cmd_set_descriptor_heap(cmd_buf, &mesh_pipeline, &sampler_heap, 1);
+		for (i32 i = 0; i < sponza.primitive_count; i++)
 		{
-			rhi_cmd_set_vertex_buffer(cmd_buf, &suzanne.primitives[i].vertex_buffer);
-			rhi_cmd_set_index_buffer(cmd_buf, &suzanne.primitives[i].index_buffer);
-			rhi_cmd_draw_indexed(cmd_buf, suzanne.primitives[i].index_count);
+			matrices.camera_matrix = camera.view_projection;
+			matrices.camera_pos = camera.position;
+			rhi_cmd_set_push_constants(cmd_buf, &mesh_pipeline, &matrices, sizeof(matrices));
+			rhi_cmd_set_descriptor_set(cmd_buf, &mesh_pipeline, &sponza.materials[sponza.primitives[i].material_index].material_set, 2);
+			rhi_cmd_set_vertex_buffer(cmd_buf, &sponza.primitives[i].vertex_buffer);
+			rhi_cmd_set_index_buffer(cmd_buf, &sponza.primitives[i].index_buffer);
+			rhi_cmd_draw_indexed(cmd_buf, sponza.primitives[i].index_count);
 		}
 		
 		rhi_cmd_img_transition_layout(cmd_buf, swap_chain_image, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
@@ -162,18 +148,13 @@ int main()
 	
 	rhi_wait_idle();
 
-	rhi_free_pipeline(&triangle_pipeline);
-	rhi_free_descriptor_set(&material_set);
-	rhi_free_buffer(&triangle_material);
-	mesh_free(&suzanne);
-	rhi_free_image(&triangle_texture);
-	rhi_free_sampler(&triangle_sampler);
-	rhi_free_descriptor_set_layout(&material_set_layout);
+	mesh_loader_free();
+	rhi_free_pipeline(&mesh_pipeline);
+	mesh_free(&sponza);
+	rhi_free_sampler(&nearest_sampler);
 	rhi_free_image(&depth_buffer);
-
 	rhi_free_descriptor_heap(&image_heap);
 	rhi_free_descriptor_heap(&sampler_heap);
-
 	rhi_shutdown();
 	
 	aurora_platform_free_window();

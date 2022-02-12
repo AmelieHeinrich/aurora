@@ -500,17 +500,17 @@ void rhi_make_allocator()
 void rhi_make_descriptors()
 {
     VkDescriptorPoolSize sizes[] = {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024 }
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 4096 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 4096 }
     };
 
     VkDescriptorPoolCreateInfo pool_info = {0};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.pPoolSizes = sizes;
     pool_info.poolSizeCount = 4;
-    pool_info.maxSets = 16;
+    pool_info.maxSets = 2048;
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
     VkResult res = vkCreateDescriptorPool(state.device, &pool_info, NULL, &state.descriptor_pool);
@@ -518,7 +518,7 @@ void rhi_make_descriptors()
 
     VkDescriptorSetLayoutBinding binding = {0};
     binding.binding = 0;
-    binding.descriptorCount = 512;
+    binding.descriptorCount = 2048;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     binding.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -545,12 +545,12 @@ void rhi_make_descriptors()
 
     state.rhi_image_heap.binding = 0;
     state.rhi_image_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    state.rhi_image_heap.descriptor_count = 512;
+    state.rhi_image_heap.descriptor_count = 2048;
     state.rhi_image_heap.layout = state.image_heap_layout;
 
     state.rhi_sampler_heap.binding = 1;
     state.rhi_sampler_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLER;
-    state.rhi_sampler_heap.descriptor_count = 512;
+    state.rhi_sampler_heap.descriptor_count = 2048;
     state.rhi_sampler_heap.layout = state.sampler_heap_layout;
 }
 
