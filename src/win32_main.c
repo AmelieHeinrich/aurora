@@ -44,7 +44,7 @@ int main()
 	mesh_load(&sponza.m, "assets/Sponza.gltf");
 	sponza.model_matrix = HMM_Mat4d(1.0f);
 	sponza.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
-	sponza.model_matrix = HMM_MultiplyMat4(sponza.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
+	sponza.model_matrix = HMM_MultiplyMat4(sponza.model_matrix, HMM_Rotate(-180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
 	rge.drawables[0] = sponza;
 	rge.drawable_count++;
 

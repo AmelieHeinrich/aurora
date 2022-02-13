@@ -4,38 +4,18 @@
 
 layout (location = 0) out vec4 OutColor;
 
-layout (location = 0) in vec3 fPosition;
-layout (location = 1) in vec2 fTexcoords;
-layout (location = 2) in vec3 fNormals;
-layout (location = 3) in vec3 fCameraPos;
+layout (location = 0) in vec2 fTexcoords;
 
-layout (binding = 0, set = 1) uniform texture2D TextureHeap[512];
-layout (binding = 0, set = 2) uniform sampler   SamplerHeap[512];
-layout (binding = 0, set = 3) uniform BindlessMaterial {
-    uint AlbedoIndex;
-    uint NormalIndex;
-    uint MetallicRoughnessIndex;
-    vec3 BaseColorFactor;
-    float MetallicFactor;
-    float RoughnessFactor;
+layout (binding = 0, set = 0) uniform texture2D gPosition;
+layout (binding = 1, set = 0) uniform texture2D gNormal;
+layout (binding = 2, set = 0) uniform texture2D gAlbedo;
+layout (binding = 3, set = 0) uniform texture2D gMetallicRoughness;
+layout (binding = 0, set = 1) uniform sampler   SamplerHeap[16];
+
+layout (push_constant) uniform CameraConstants {
+    vec3 fCameraPos;
+    float pad;
 };
-
-vec3 GetNormalFromMap()
-{
-    vec3 tangentNormal = texture(sampler2D(TextureHeap[NormalIndex], SamplerHeap[0]), fTexcoords).xyz * 2.0 - 1.0;
-
-    vec3 Q1  = dFdx(fPosition);
-    vec3 Q2  = dFdy(fPosition);
-    vec2 st1 = dFdx(fTexcoords);
-    vec2 st2 = dFdy(fTexcoords);
-
-    vec3 N   = normalize(fNormals);
-    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
-    vec3 B  = -normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -84,35 +64,37 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 
 void main() 
 {   
-    vec4 albedo = texture(sampler2D(TextureHeap[AlbedoIndex], SamplerHeap[0]), fTexcoords.xy) * vec4(BaseColorFactor, 1.0);
-    if (albedo.a < 0.25)
-        discard;
-    albedo.rgb = pow(albedo.rgb, vec3(2.2));
+    vec3 FragPos = texture(sampler2D(gPosition, SamplerHeap[0]), fTexcoords.xy).rgb;
+    vec3 N = texture(sampler2D(gNormal, SamplerHeap[0]), fTexcoords.xy).rgb;
+    vec4 Diffuse = texture(sampler2D(gAlbedo, SamplerHeap[0]), fTexcoords.xy);
+    vec4 MR = texture(sampler2D(gMetallicRoughness, SamplerHeap[0]), fTexcoords.xy);
 
-    float ao = 1.0f;
-    float metallic = texture(sampler2D(TextureHeap[MetallicRoughnessIndex], SamplerHeap[0]), fTexcoords.xy).g * MetallicFactor;
-    float roughness = texture(sampler2D(TextureHeap[MetallicRoughnessIndex], SamplerHeap[0]), fTexcoords.xy).b * RoughnessFactor;
-    vec3 N = GetNormalFromMap();
+    float metallic = MR.g;
+    float roughness = MR.b;
 
     if (metallic == 0.0)
         metallic = 1.0;
     if (roughness == 0.0)
         roughness = 1.0;
-    if (N.r == 0 || N.g == 0 || N.b == 0)
-        N = normalize(fNormals);
 
-    vec3 V = normalize(fCameraPos - fPosition);
+    if (Diffuse.a < 0.25)
+        discard;
+    Diffuse.rgb = pow(Diffuse.rgb, vec3(2.2));
+
+    float ao = 1.0f;
+
+    vec3 V = normalize(fCameraPos - FragPos);
     vec3 R = reflect(-V, N); 
 
     vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo.rgb, metallic);
+    F0 = mix(F0, Diffuse.rgb, metallic);
 
     vec3 Lo = vec3(0.0);
 
     {
-        vec3 L = normalize(fCameraPos - fPosition);
+        vec3 L = normalize(fCameraPos - FragPos);
         vec3 H = normalize(V + L);
-        float distance = length(fCameraPos - fPosition);
+        float distance = length(fCameraPos - FragPos);
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance = vec3(100.0) * attenuation;
 
@@ -131,10 +113,10 @@ void main()
 
         float NdotL = max(dot(N, L), 0.0);        
 
-        Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;    
+        Lo += (kD * Diffuse.rgb / PI + specular) * radiance * NdotL;    
     }      
 
-    vec3 ambient = vec3(0.03) * albedo.rgb * ao;
+    vec3 ambient = vec3(0.03) * Diffuse.rgb * ao;
     vec3 color = ambient + Lo;
 
     OutColor = vec4(color, 1.0);

@@ -960,9 +960,12 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment = {0};
-    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    color_blend_attachment.blendEnable = VK_FALSE;
+    VkPipelineColorBlendAttachmentState color_blends[32] = {0};
+    for (i32 i = 0; i < descriptor->color_attachment_count; i++)
+    {
+        color_blends[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        color_blends[i].blendEnable = VK_FALSE;
+    }
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil = {0};
     depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -978,8 +981,8 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
     color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     color_blending.logicOpEnable = VK_FALSE;
     color_blending.logicOp = VK_LOGIC_OP_COPY;
-    color_blending.attachmentCount = 1;
-    color_blending.pAttachments = &color_blend_attachment;
+    color_blending.attachmentCount = descriptor->color_attachment_count;
+    color_blending.pAttachments = color_blends;
     color_blending.blendConstants[0] = 0.0f;
     color_blending.blendConstants[1] = 0.0f;
     color_blending.blendConstants[2] = 0.0f;
