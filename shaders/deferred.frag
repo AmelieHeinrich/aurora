@@ -1,6 +1,15 @@
 #version 460
 
 #define PI 3.14159265359
+#define MAX_LIGHTS 512
+
+struct PointLight
+{
+    vec3 position;
+    float pad;
+    vec3 color;
+    float pad2;
+};
 
 layout (location = 0) out vec4 OutColor;
 
@@ -11,6 +20,12 @@ layout (binding = 1, set = 0) uniform texture2D gNormal;
 layout (binding = 2, set = 0) uniform texture2D gAlbedo;
 layout (binding = 3, set = 0) uniform texture2D gMetallicRoughness;
 layout (binding = 0, set = 1) uniform sampler   SamplerHeap[16];
+
+layout (binding = 0, set = 2) uniform Lights {
+    PointLight lights[MAX_LIGHTS];
+    int light_count;
+    vec3 _light_pad;
+};
 
 layout (push_constant) uniform CameraConstants {
     vec3 fCameraPos;
@@ -91,12 +106,13 @@ void main()
 
     vec3 Lo = vec3(0.0);
 
+    for (int i = 0; i < light_count; i++)
     {
-        vec3 L = normalize(fCameraPos - FragPos);
+        vec3 L = normalize(lights[i].position - FragPos);
         vec3 H = normalize(V + L);
-        float distance = length(fCameraPos - FragPos);
+        float distance = length(lights[i].position - FragPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = vec3(100.0) * attenuation;
+        vec3 radiance = lights[i].color * attenuation;
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);   

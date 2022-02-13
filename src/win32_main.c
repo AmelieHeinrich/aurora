@@ -8,6 +8,9 @@
 #include "final_blit_pass.h"
 
 #include <stdio.h>
+#include <time.h>
+
+#define TEST_LIGHT_COUNT 64
 
 global fps_camera camera;
 global f64 last_frame;
@@ -29,8 +32,16 @@ void game_resize(u32 width, u32 height)
 	resize_render_graph(&rg, &rge);
 }
 
+f32 float_rand(f32 min, f32 max)
+{
+    f32 scale = rand() / (f32)RAND_MAX; /* [0, 1.0] */
+    return min + scale * ( max - min );      /* [min, max] */
+}
+
 int main()
 {
+	srand(time(NULL));
+
 	aurora_platform_layer_init();
 	platform.width = 1280;
 	platform.height = 720;
@@ -40,6 +51,18 @@ int main()
 	rhi_init();
 	fps_camera_init(&camera);
 	init_render_graph(&rg, &rge);
+
+	for (i32 i = 0; i < TEST_LIGHT_COUNT; i++)
+	{
+		rge.light_info.lights[i].position.X = float_rand(-3.0f, 3.0f);
+		rge.light_info.lights[i].position.Y = float_rand(-1.0f, -5.0f);
+		rge.light_info.lights[i].position.Z = float_rand(-3.0f, 3.0f);
+
+		rge.light_info.lights[i].color.X = float_rand(0.1f, 4.0f);
+		rge.light_info.lights[i].color.Y = float_rand(0.1f, 4.0f);
+		rge.light_info.lights[i].color.Z = float_rand(0.1f, 4.0f);
+	}
+	rge.light_info.light_count = TEST_LIGHT_COUNT;
 
 	mesh_load(&sponza.m, "assets/Sponza.gltf");
 	sponza.model_matrix = HMM_Mat4d(1.0f);

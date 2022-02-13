@@ -23,6 +23,7 @@ void recursively_add_nodes(render_graph_node* node, render_graph* graph)
 void init_render_graph(render_graph* graph, render_graph_execute* execute)
 {
     memset(graph, 0, sizeof(render_graph));
+    memset(&execute->light_info, 0, sizeof(execute->light_info));
     graph->node_count = 0;
 
     rhi_init_descriptor_heap(&execute->image_heap, DESCRIPTOR_HEAP_IMAGE, 1024);
@@ -35,10 +36,19 @@ void init_render_graph(render_graph* graph, render_graph_execute* execute)
     execute->camera_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     rhi_init_descriptor_set_layout(&execute->camera_descriptor_set_layout);
 
+    execute->light_descriptor_set_layout.binding = 2;
+    execute->light_descriptor_set_layout.descriptor_count = 1;
+    execute->light_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
+    rhi_init_descriptor_set_layout(&execute->light_descriptor_set_layout);
+
     rhi_allocate_buffer(&execute->camera_buffer, sizeof(execute->camera), BUFFER_UNIFORM);
+    rhi_allocate_buffer(&execute->light_buffer, sizeof(execute->light_info), BUFFER_UNIFORM);
     
     rhi_init_descriptor_set(&execute->camera_descriptor_set, &execute->camera_descriptor_set_layout);
     rhi_descriptor_set_write_buffer(&execute->camera_descriptor_set, &execute->camera_buffer, sizeof(execute->camera), 0);
+
+    rhi_init_descriptor_set(&execute->light_descriptor_set, &execute->light_descriptor_set_layout);
+    rhi_descriptor_set_write_buffer(&execute->light_descriptor_set, &execute->light_buffer, sizeof(execute->light_info), 0);
 }
 
 void connect_render_graph_nodes(render_graph* graph, u32 src_id, u32 dst_id, render_graph_node* src_node, render_graph_node* dst_node)
@@ -98,6 +108,10 @@ void free_render_graph(render_graph* graph, render_graph_execute* execute)
     for (u32 i = 0; i < graph->node_count; i++)
         graph->nodes[i]->free(graph->nodes[i], execute);
 
+    rhi_free_buffer(&execute->light_buffer);
+    rhi_free_descriptor_set(&execute->light_descriptor_set);
+    rhi_free_descriptor_set_layout(&execute->light_descriptor_set_layout);
+
     rhi_free_buffer(&execute->camera_buffer);
     rhi_free_descriptor_set(&execute->camera_descriptor_set);
     rhi_free_descriptor_set_layout(&execute->camera_descriptor_set_layout);
@@ -112,6 +126,7 @@ void resize_render_graph(render_graph* graph, render_graph_execute* execute)
 void update_render_graph(render_graph* graph, render_graph_execute* execute)
 {
     rhi_upload_buffer(&execute->camera_buffer, &execute->camera, sizeof(execute->camera));
+    rhi_upload_buffer(&execute->light_buffer, &execute->light_info, sizeof(execute->light_info));
 
     for (u32 i = 0; i < graph->node_count; i++)
         graph->nodes[i]->update(graph->nodes[i], execute);

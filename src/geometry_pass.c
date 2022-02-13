@@ -125,7 +125,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.push_constant_size = sizeof(hmm_vec4);
         descriptor.set_layouts[0] = &data->deferred_set_layout;
         descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
-        descriptor.set_layout_count = 2;
+        descriptor.set_layouts[2] = &execute->light_descriptor_set_layout;
+        descriptor.set_layout_count = 3;
         descriptor.shaders.vs = &vs;
         descriptor.shaders.ps = &fs;
 
@@ -221,6 +222,7 @@ void geometry_pass_update(render_graph_node* node, render_graph_execute* execute
         rhi_cmd_set_pipeline(cmd_buf, &data->deferred_pipeline);
         rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &data->deferred_set, 0);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->deferred_pipeline, &execute->sampler_heap, 1);
+        rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &execute->light_descriptor_set, 2);
         rhi_cmd_set_push_constants(cmd_buf, &data->deferred_pipeline, &temp, sizeof(hmm_vec4));
         rhi_cmd_set_vertex_buffer(cmd_buf, &data->screen_vertex_buffer);
         rhi_cmd_draw(cmd_buf, 4);
