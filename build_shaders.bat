@@ -3,8 +3,8 @@
 set rootDir=%cd%
 
 pushd shaders
-call %VULKAN_SDK%/bin/glslc.exe -g -O %rootDir%/shaders/triangle_vert.vert -o triangle_vert.vert.spv
-call %VULKAN_SDK%/bin/glslc.exe -g -O %rootDir%/shaders/triangle_frag.frag -o triangle_frag.frag.spv
+call %VULKAN_SDK%/bin/glslc.exe -g -O %rootDir%/shaders/geometry.vert -o geometry.vert.spv
+call %VULKAN_SDK%/bin/glslc.exe -g -O %rootDir%/shaders/geometry.frag -o geometry.frag.spv
 popd
 
 Xcopy shaders build\shaders\ /y

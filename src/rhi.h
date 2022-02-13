@@ -23,8 +23,8 @@ TODO: Global Illumination
 #define BUFFER_VERTEX VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 #define BUFFER_INDEX VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 #define BUFFER_UNIFORM VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
-#define IMAGE_RTV VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
-#define IMAGE_DSV VK_IMAGE_USAGE_DEPTH_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
+#define IMAGE_RTV VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+#define IMAGE_DSV VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
 #define IMAGE_STORAGE VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_SAMPLED_BIT
 #define DESCRIPTOR_HEAP_IMAGE 0
 #define DESCRIPTOR_HEAP_SAMPLER 1
@@ -236,5 +236,6 @@ void rhi_cmd_dispatch(rhi_command_buf* buf, u32 x, u32 y, u32 z);
 void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info);
 void rhi_cmd_end_render(rhi_command_buf* buf);
 void rhi_cmd_img_transition_layout(rhi_command_buf* buf, rhi_image* img, u32 src_access, u32 dst_access, u32 src_layout, u32 dst_layout, u32 src_p_stage, u32 dst_p_stage, u32 layer);
+void rhi_cmd_img_blit(rhi_command_buf* buf, rhi_image* src, rhi_image* dst, u32 srcl, u32 dstl);
 
 #endif

@@ -9,8 +9,11 @@ layout (location = 1) out vec2 fTexcoords;
 layout (location = 2) out vec3 fNormals;
 layout (location = 3) out vec3 fCameraPos;
 
-layout (push_constant) uniform CameraConstants {
+layout (push_constant) uniform ModelConstants {
     mat4 ModelMatrix;
+};
+
+layout (binding = 0, set = 0) uniform CameraUniform {
     mat4 camera;
     vec3 camera_pos;
     float pad;

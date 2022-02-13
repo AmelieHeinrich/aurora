@@ -9,9 +9,9 @@ layout (location = 1) in vec2 fTexcoords;
 layout (location = 2) in vec3 fNormals;
 layout (location = 3) in vec3 fCameraPos;
 
-layout (binding = 0, set = 0) uniform texture2D TextureHeap[512];
-layout (binding = 0, set = 1) uniform sampler   SamplerHeap[512];
-layout (binding = 0, set = 2) uniform BindlessMaterial {
+layout (binding = 0, set = 1) uniform texture2D TextureHeap[512];
+layout (binding = 0, set = 2) uniform sampler   SamplerHeap[512];
+layout (binding = 0, set = 3) uniform BindlessMaterial {
     uint AlbedoIndex;
     uint NormalIndex;
     uint MetallicRoughnessIndex;

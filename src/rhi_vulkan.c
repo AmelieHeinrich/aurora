@@ -353,7 +353,7 @@ void rhi_make_swapchain()
     create_info.minImageCount = FRAMES_IN_FLIGHT;
     create_info.imageExtent = state.swap_chain_extent;
     create_info.imageArrayLayers = 1;
-    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 1;
     create_info.pQueueFamilyIndices = queue_family_indices;
@@ -1594,4 +1594,21 @@ void rhi_cmd_img_transition_layout(rhi_command_buf* buf, rhi_image* img, u32 src
     barrier.subresourceRange = range;
 
     vkCmdPipelineBarrier(buf->buf, src_p_stage, dst_p_stage, 0, 0, NULL, 0, NULL, 1, &barrier);
+}
+
+void rhi_cmd_img_blit(rhi_command_buf* buf, rhi_image* src, rhi_image* dst, u32 srcl, u32 dstl)
+{
+    VkImageBlit region = { 0 };
+    region.srcOffsets[1].x = src->extent.width;
+    region.srcOffsets[1].y = src->extent.height;
+    region.srcOffsets[1].z = 1;
+    region.srcSubresource.layerCount = 1;
+    region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.dstOffsets[1].x = dst->extent.width;
+    region.dstOffsets[1].y = dst->extent.height;
+    region.dstOffsets[1].z = 1;
+    region.dstSubresource.layerCount = 1;
+    region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    vkCmdBlitImage(buf->buf, src->image, srcl, dst->image, dstl, 1, &region, VK_FILTER_NEAREST);
 }
