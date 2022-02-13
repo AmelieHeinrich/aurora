@@ -5,8 +5,8 @@ struct geometry_pass
 {
     b32 first_render;
 
-    rhi_pipeline geometry_pipeline;
     rhi_sampler linear_sampler;
+    rhi_pipeline geometry_pipeline;
 };
 
 void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)

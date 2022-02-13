@@ -204,7 +204,9 @@ void rhi_upload_buffer(rhi_buffer* buffer, void* data, u64 size);
 
 // Image
 void rhi_allocate_image(rhi_image* image, i32 width, i32 height, VkFormat format, u32 usage);
+void rhi_allocate_cubemap(rhi_image* image, i32 width, i32 height, VkFormat format, u32 usage);
 void rhi_load_image(rhi_image* image, const char* path);
+void rhi_load_hdr_image(rhi_image* image, const char* path);
 void rhi_free_image(rhi_image* image);
 void rhi_resize_image(rhi_image* image, i32 width, i32 height);
 
