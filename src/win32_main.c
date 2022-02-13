@@ -4,15 +4,18 @@
 #include "mesh.h"
 #include "render_graph.h"
 #include "geometry_pass.h"
+#include "fxaa_pass.h"
 #include "final_blit_pass.h"
 
 #include <stdio.h>
 
 global fps_camera camera;
 global f64 last_frame;
+
 global render_graph rg;
 global render_graph_execute rge;
 global render_graph_node* gp;
+global render_graph_node* fxaap;
 global render_graph_node* fbp;
 global render_graph_drawable sponza;
 
@@ -46,9 +49,11 @@ int main()
 	rge.drawable_count++;
 
 	gp = create_geometry_pass();
+	fxaap = create_fxaa_pass();
 	fbp = create_final_blit_pass();
 
-	connect_render_graph_nodes(&rg, geometry_pass_output_lit, final_blit_pass_input_image, gp, fbp);
+	connect_render_graph_nodes(&rg, geometry_pass_output_lit, fxaa_pass_input_color, gp, fxaap);
+	connect_render_graph_nodes(&rg, fxaa_pass_output_anti_aliased, final_blit_pass_input_image, fxaap, fbp);
 	bake_render_graph(&rg, &rge, fbp);
 
 	while (!platform.quit)

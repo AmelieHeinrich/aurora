@@ -755,6 +755,25 @@ void rhi_descriptor_set_write_buffer(rhi_descriptor_set* set, rhi_buffer* buffer
     vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
 }
 
+void rhi_descriptor_set_write_image(rhi_descriptor_set* set, rhi_image* image, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_info.imageView = image->image_view;
+    image_info.sampler = VK_NULL_HANDLE;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pImageInfo = &image_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
 void rhi_init_sampler(rhi_sampler* sampler)
 {
     VkSamplerCreateInfo create_info = {0};
