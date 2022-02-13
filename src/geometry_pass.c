@@ -18,7 +18,7 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
 	rhi_init_sampler(&data->linear_sampler);
 	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->linear_sampler, 0);
 
-    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_RTV);
+    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_RTV);
     rhi_allocate_image(&node->outputs[1], execute->width, execute->height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     node->output_count = 2;
 
@@ -35,7 +35,7 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.use_mesh_shaders = 0;
         descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
         descriptor.color_attachment_count = 1;
-        descriptor.color_attachments_formats[0] = VK_FORMAT_R8G8B8A8_UNORM;
+        descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
         descriptor.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
         descriptor.cull_mode = VK_CULL_MODE_BACK_BIT;
         descriptor.depth_op = VK_COMPARE_OP_LESS;

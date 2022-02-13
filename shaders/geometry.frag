@@ -87,6 +87,7 @@ void main()
     vec4 albedo = texture(sampler2D(TextureHeap[AlbedoIndex], SamplerHeap[0]), fTexcoords.xy) * vec4(BaseColorFactor, 1.0);
     if (albedo.a < 0.25)
         discard;
+    albedo.rgb = pow(albedo.rgb, vec3(2.2));
 
     float ao = 1.0f;
     float metallic = texture(sampler2D(TextureHeap[MetallicRoughnessIndex], SamplerHeap[0]), fTexcoords.xy).g * MetallicFactor;
@@ -94,9 +95,9 @@ void main()
     vec3 N = GetNormalFromMap();
 
     if (metallic == 0.0)
-        metallic = MetallicFactor;
+        metallic = 1.0;
     if (roughness == 0.0)
-        roughness = RoughnessFactor;
+        roughness = 1.0;
     if (N.r == 0 || N.g == 0 || N.b == 0)
         N = normalize(fNormals);
 
@@ -113,7 +114,7 @@ void main()
         vec3 H = normalize(V + L);
         float distance = length(fCameraPos - fPosition);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = vec3(20.0) * vec3(attenuation);
+        vec3 radiance = vec3(100.0) * attenuation;
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);   
@@ -136,5 +137,5 @@ void main()
     vec3 ambient = vec3(0.03) * albedo.rgb * ao;
     vec3 color = ambient + Lo;
 
-    OutColor = albedo;
+    OutColor = vec4(color, 1.0);
 }
