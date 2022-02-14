@@ -11,6 +11,8 @@
 #include <time.h>
 
 #define TEST_LIGHT_COUNT 64
+#define TEST_MODEL_SPONZA 0
+#define TEST_MODEL_HELMET 1
 
 global fps_camera camera;
 global f64 last_frame;
@@ -20,7 +22,7 @@ global render_graph_execute rge;
 global render_graph_node* gp;
 global render_graph_node* fxaap;
 global render_graph_node* fbp;
-global render_graph_drawable sponza;
+global render_graph_drawable test_model;
 
 void game_resize(u32 width, u32 height)
 {
@@ -64,11 +66,19 @@ int main()
 	}
 	rge.light_info.light_count = TEST_LIGHT_COUNT;
 
-	mesh_load(&sponza.m, "assets/Sponza.gltf");
-	sponza.model_matrix = HMM_Mat4d(1.0f);
-	sponza.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
-	sponza.model_matrix = HMM_MultiplyMat4(sponza.model_matrix, HMM_Rotate(-180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
-	rge.drawables[0] = sponza;
+#if TEST_MODEL_SPONZA
+	mesh_load(&test_model.m, "assets/Sponza.gltf");
+	test_model.model_matrix = HMM_Mat4d(1.0f);
+	test_model.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
+	test_model.model_matrix = HMM_MultiplyMat4(test_model.model_matrix, HMM_Rotate(-180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
+#elif TEST_MODEL_HELMET
+	mesh_load(&test_model.m, "assets/DamagedHelmet.gltf");
+	test_model.model_matrix = HMM_Mat4d(1.0f);
+	test_model.model_matrix = HMM_MultiplyMat4(test_model.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f)));
+	test_model.model_matrix = HMM_MultiplyMat4(test_model.model_matrix, HMM_Rotate(-90.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
+#endif
+
+	rge.drawables[0] = test_model;
 	rge.drawable_count++;
 
 	gp = create_geometry_pass();
@@ -102,7 +112,7 @@ int main()
 	
 	rhi_wait_idle();
 
-	mesh_free(&sponza.m);
+	mesh_free(&test_model.m);
 
 	free_render_graph(&rg, &rge);
 

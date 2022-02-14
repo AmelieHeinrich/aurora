@@ -48,8 +48,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
 
     rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
     rhi_allocate_image(&data->gNormal, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
-    rhi_allocate_image(&data->gAlbedo, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
-    rhi_allocate_image(&data->gMetallicRoughness, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
+    rhi_allocate_image(&data->gAlbedo, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER);
+    rhi_allocate_image(&data->gMetallicRoughness, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER);
     rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_RTV);
     rhi_allocate_image(&node->outputs[1], execute->width, execute->height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     node->output_count = 2;
@@ -82,8 +82,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
         descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
         descriptor.color_attachments_formats[1] = VK_FORMAT_R16G16B16A16_SFLOAT;
-        descriptor.color_attachments_formats[2] = VK_FORMAT_R16G16B16A16_SFLOAT;
-        descriptor.color_attachments_formats[3] = VK_FORMAT_R16G16B16A16_SFLOAT;
+        descriptor.color_attachments_formats[2] = VK_FORMAT_R8G8B8A8_UNORM;
+        descriptor.color_attachments_formats[3] = VK_FORMAT_R8G8B8A8_UNORM;
         descriptor.color_attachment_count = 4;
         descriptor.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
         descriptor.cull_mode = VK_CULL_MODE_BACK_BIT;

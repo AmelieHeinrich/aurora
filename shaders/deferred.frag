@@ -88,9 +88,9 @@ void main()
     float roughness = MR.b;
 
     if (metallic == 0.0)
-        metallic = 1.0;
+        metallic = 0.1;
     if (roughness == 0.0)
-        roughness = 1.0;
+        roughness = 0.5;
 
     if (Diffuse.a < 0.25)
         discard;
