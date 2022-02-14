@@ -187,6 +187,7 @@ void rhi_init_descriptor_set(rhi_descriptor_set* set, rhi_descriptor_set_layout*
 void rhi_free_descriptor_set(rhi_descriptor_set* set);
 void rhi_descriptor_set_write_image(rhi_descriptor_set* set, rhi_image* image, i32 binding);
 void rhi_descriptor_set_write_buffer(rhi_descriptor_set* set, rhi_buffer* buffer, i32 size, i32 binding);
+void rhi_descriptor_set_write_storage_buffer(rhi_descriptor_set* set, rhi_buffer* buffer, i32 size, i32 binding);
 
 // Samplers
 void rhi_init_sampler(rhi_sampler* sampler);

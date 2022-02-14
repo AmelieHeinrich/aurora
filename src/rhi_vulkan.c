@@ -307,6 +307,14 @@ void rhi_make_device()
             if (!strcmp(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, properties[i].extensionName)) {
                 state.device_extensions[state.device_extension_count++] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
             }
+
+            if (!strcmp(VK_KHR_16BIT_STORAGE_EXTENSION_NAME, properties[i].extensionName)) {
+                state.device_extensions[state.device_extension_count++] = VK_KHR_16BIT_STORAGE_EXTENSION_NAME;
+            }
+
+            if (!strcmp(VK_KHR_8BIT_STORAGE_EXTENSION_NAME, properties[i].extensionName)) {
+                state.device_extensions[state.device_extension_count++] = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
+            }
         }
 
         free(properties);
@@ -751,6 +759,25 @@ void rhi_descriptor_set_write_buffer(rhi_descriptor_set* set, rhi_buffer* buffer
     write.dstArrayElement = 0;
     write.pBufferInfo = &buffer_info;
     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
+void rhi_descriptor_set_write_storage_buffer(rhi_descriptor_set* set, rhi_buffer* buffer, i32 size, i32 binding)
+{
+    VkDescriptorBufferInfo buffer_info = {0};
+    buffer_info.buffer = buffer->buffer;
+    buffer_info.offset = 0;
+    buffer_info.range = size;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pBufferInfo = &buffer_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
     vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
 }

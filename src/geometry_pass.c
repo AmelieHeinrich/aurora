@@ -71,14 +71,16 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
     }
 
     {
-        rhi_shader_module vs;
+        rhi_shader_module ts;
+        rhi_shader_module ms;
         rhi_shader_module fs;
 
-        rhi_load_shader(&vs, "shaders/gbuffer.vert.spv");
+        rhi_load_shader(&ts, "shaders/gbuffer.task.spv");
+        rhi_load_shader(&ms, "shaders/gbuffer.mesh.spv");
         rhi_load_shader(&fs, "shaders/gbuffer.frag.spv");
 
         rhi_pipeline_descriptor descriptor;
-        descriptor.use_mesh_shaders = 0;
+        descriptor.use_mesh_shaders = 1;
         descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
         descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
         descriptor.color_attachments_formats[1] = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -95,14 +97,17 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layouts[1] = rhi_get_image_heap_set_layout();
         descriptor.set_layouts[2] = rhi_get_sampler_heap_set_layout();
         descriptor.set_layouts[3] = mesh_loader_get_descriptor_set_layout();
-        descriptor.set_layout_count = 4;
-        descriptor.shaders.vs = &vs;
+        descriptor.set_layouts[4] = mesh_loader_get_geometry_descriptor_set_layout();
+        descriptor.set_layout_count = 5;
+        descriptor.shaders.ts = &ts;
+        descriptor.shaders.ms = &ms;
         descriptor.shaders.ps = &fs;
         descriptor.depth_biased_enable = 0;
 
         rhi_init_graphics_pipeline(&data->gbuffer_pipeline, &descriptor);
 
-        rhi_free_shader(&vs);
+        rhi_free_shader(&ts);
+        rhi_free_shader(&ms);
         rhi_free_shader(&fs);
     }
 
@@ -186,10 +191,9 @@ void geometry_pass_update(render_graph_node* node, render_graph_execute* execute
             for (u32 i = 0; i < drawable->m.primitive_count; i++)
 	        {
 	        	rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &drawable->model_matrix, sizeof(hmm_mat4));
-	        	rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &drawable->m.materials[drawable->m.primitives[i].material_index].material_set, 3);
-	        	rhi_cmd_set_vertex_buffer(cmd_buf, &drawable->m.primitives[i].vertex_buffer);
-	        	rhi_cmd_set_index_buffer(cmd_buf, &drawable->m.primitives[i].index_buffer);
-	        	rhi_cmd_draw_indexed(cmd_buf, drawable->m.primitives[i].index_count);
+                rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &drawable->m.materials[drawable->m.primitives[i].material_index].material_set, 3);
+                rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &drawable->m.primitives[i].geometry_descriptor_set, 4);
+	        	rhi_cmd_draw_meshlets(cmd_buf, drawable->m.primitives[i].meshlet_count);
 	        }
         }
 

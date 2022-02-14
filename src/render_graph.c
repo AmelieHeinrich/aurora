@@ -29,9 +29,9 @@ void init_render_graph(render_graph* graph, render_graph_execute* execute)
     rhi_init_descriptor_heap(&execute->image_heap, DESCRIPTOR_HEAP_IMAGE, 1024);
 	rhi_init_descriptor_heap(&execute->sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 16);
 	mesh_loader_set_texture_heap(&execute->image_heap);
-	mesh_loader_init(3);
+	mesh_loader_init(4);
 
-    execute->camera_descriptor_set_layout.binding = 2;
+    execute->camera_descriptor_set_layout.binding = 1;
     execute->camera_descriptor_set_layout.descriptor_count = 1;
     execute->camera_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     rhi_init_descriptor_set_layout(&execute->camera_descriptor_set_layout);

@@ -22,9 +22,9 @@ typedef struct meshlet meshlet;
 struct meshlet
 {
     u32 vertices[MAX_MESHLET_VERTICES];
-    u32 indices[MAX_MESHLET_INDICES];
-    u32 vertex_count;
-    u32 triangle_count;
+    u8 indices[MAX_MESHLET_INDICES];
+    u8 vertex_count;
+    u8 triangle_count;
 };
 
 typedef struct gltf_material gltf_material;
@@ -51,6 +51,7 @@ struct primitive
     rhi_buffer vertex_buffer;
     rhi_buffer index_buffer;
     rhi_buffer meshlet_buffer;
+    rhi_descriptor_set geometry_descriptor_set;
 
     u32 vertex_size;
     u32 index_size;
@@ -82,6 +83,7 @@ struct mesh
 void mesh_loader_init(i32 dset_layout_binding);
 void mesh_loader_free();
 rhi_descriptor_set_layout* mesh_loader_get_descriptor_set_layout();
+rhi_descriptor_set_layout* mesh_loader_get_geometry_descriptor_set_layout();
 void mesh_loader_set_texture_heap(rhi_descriptor_heap* heap);
 void mesh_load(mesh* out, const char* path);
 void mesh_free(mesh* m);

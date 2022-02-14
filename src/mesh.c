@@ -9,24 +9,66 @@
 
 internal rhi_descriptor_heap* s_image_heap;
 internal rhi_descriptor_set_layout s_descriptor_set_layout;
+internal rhi_descriptor_set_layout s_meshlet_set_layout;
+
+typedef struct meshlet_vector meshlet_vector;
+struct meshlet_vector
+{
+    meshlet* meshlets;
+    u32 used;
+    u32 size;
+};
+
+void init_meshlet_vector(meshlet_vector* vec, u32 start_size)
+{
+    vec->meshlets = calloc(start_size, sizeof(meshlet));
+    vec->size = start_size;
+    vec->used = 0;
+}
+
+void free_meshlet_vector(meshlet_vector* vec)
+{
+    free(vec->meshlets);
+}
+
+void push_meshlet(meshlet_vector* vec, meshlet m)
+{
+    if (vec->used >= vec->size)
+    {
+        vec->size *= 2;
+        vec->meshlets = realloc(vec->meshlets, vec->size * sizeof(meshlet));
+    }
+    vec->meshlets[vec->used++] = m;
+}
 
 void mesh_loader_init(i32 dset_layout_binding)
 {
     s_descriptor_set_layout.binding = dset_layout_binding;
     s_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     s_descriptor_set_layout.descriptor_count = 1;
-    
     rhi_init_descriptor_set_layout(&s_descriptor_set_layout);
+
+    s_meshlet_set_layout.binding = 0;
+    s_meshlet_set_layout.descriptors[0] = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    s_meshlet_set_layout.descriptors[1] = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    s_meshlet_set_layout.descriptor_count = 2;
+    rhi_init_descriptor_set_layout(&s_meshlet_set_layout);
 }
 
 void mesh_loader_free()
 {
+    rhi_free_descriptor_set_layout(&s_meshlet_set_layout);
     rhi_free_descriptor_set_layout(&s_descriptor_set_layout);
 }
 
 rhi_descriptor_set_layout* mesh_loader_get_descriptor_set_layout()
 {
     return &s_descriptor_set_layout;
+}
+
+rhi_descriptor_set_layout* mesh_loader_get_geometry_descriptor_set_layout()
+{
+    return &s_meshlet_set_layout;
 }
 
 void mesh_loader_set_texture_heap(rhi_descriptor_heap* heap)
@@ -178,7 +220,70 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     rhi_allocate_buffer(&pri->index_buffer, index_size, BUFFER_INDEX);
     rhi_upload_buffer(&pri->index_buffer, indices, index_size);
 
-    // TODO: Meshlets
+    meshlet_vector vec;
+    init_meshlet_vector(&vec, 256);
+
+    u8* meshlet_vertices = (u8*)malloc(sizeof(u8) * vertex_count);
+    memset(meshlet_vertices, 0xff, sizeof(u8) * vertex_count);
+
+    meshlet ml;
+    memset(&ml, 0, sizeof(ml));
+
+    for (i64 i = 0; i < pri->index_count; i += 3)
+    {
+        u32 a = indices[i + 0];
+        u32 b = indices[i + 1];
+        u32 c = indices[i + 2];
+
+        u8 av = meshlet_vertices[a];
+        u8 bv = meshlet_vertices[b];
+        u8 cv = meshlet_vertices[c];
+
+        u32 used_extra = (av == 0xff) + (bv == 0xff) + (cv == 0xff);
+
+        if (ml.vertex_count + used_extra > MAX_MESHLET_VERTICES || ml.triangle_count >= MAX_MESHLET_TRIANGLES)
+        {
+            push_meshlet(&vec, ml);
+            
+            for (size_t j = 0; j < ml.vertex_count; ++j)
+                meshlet_vertices[ml.vertices[j]] = 0xff;
+
+            memset(&ml, 0, sizeof(ml));
+        }
+
+        if (av == 0xff)
+        {
+            av = ml.vertex_count;
+            ml.vertices[ml.vertex_count++] = a;
+        }
+
+        if (bv == 0xff)
+        {
+            bv = ml.vertex_count;
+            ml.vertices[ml.vertex_count++] = b;
+        }
+
+        if (cv == 0xff)
+        {
+            cv = ml.vertex_count;
+            ml.vertices[ml.vertex_count++] = c;
+        }
+
+        ml.indices[ml.triangle_count * 3 + 0] = av;
+        ml.indices[ml.triangle_count * 3 + 1] = bv;
+        ml.indices[ml.triangle_count * 3 + 2] = cv;
+        ml.triangle_count++;
+    }
+
+    if (ml.triangle_count)
+        push_meshlet(&vec, ml);
+
+    rhi_allocate_buffer(&pri->meshlet_buffer, vec.used * sizeof(meshlet), BUFFER_VERTEX);
+    rhi_upload_buffer(&pri->meshlet_buffer, vec.meshlets, vec.used * sizeof(meshlet));
+
+    rhi_init_descriptor_set(&pri->geometry_descriptor_set, &s_meshlet_set_layout);
+    rhi_descriptor_set_write_storage_buffer(&pri->geometry_descriptor_set, &pri->vertex_buffer, vertices_size, 0);
+    rhi_descriptor_set_write_storage_buffer(&pri->geometry_descriptor_set, &pri->meshlet_buffer, vec.used * sizeof(meshlet), 1);
 
     typedef struct temp_mat
     {
@@ -261,11 +366,13 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     pri->triangle_count = pri->index_count / 3;
     pri->vertex_size = vertices_size;
     pri->index_size = index_size;
+    pri->meshlet_count = vec.used;
 
     m->total_vertex_count += pri->vertex_count;
     m->total_index_count += pri->index_count;
     m->total_triangle_count += pri->triangle_count;
 
+    free_meshlet_vector(&vec);
     free(indices);
     free(vertices);
 }
@@ -314,8 +421,10 @@ void mesh_free(mesh* m)
 {
     for (i32 i = 0; i < m->primitive_count; i++)
     {
+        rhi_free_buffer(&m->primitives[i].meshlet_buffer);
         rhi_free_buffer(&m->primitives[i].index_buffer);
         rhi_free_buffer(&m->primitives[i].vertex_buffer);
+        rhi_free_descriptor_set(&m->primitives[i].geometry_descriptor_set);
     }
 
     for (i32 i = 0; i < m->material_count; i++)
