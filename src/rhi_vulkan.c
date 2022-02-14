@@ -915,14 +915,15 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
         input_assembly.primitiveRestartEnable = VK_FALSE;
     }
 
-    VkDynamicState states[] = {
+    VkDynamicState states[3] = {
         VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
+        VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_DEPTH_BIAS
     };
 
     VkPipelineDynamicStateCreateInfo dynamic_state = {0};
     dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamic_state.dynamicStateCount = 2;
+    dynamic_state.dynamicStateCount = descriptor->depth_biased_enable ? 3 : 2;
     dynamic_state.pDynamicStates = states;
 
     VkViewport viewport = {0};

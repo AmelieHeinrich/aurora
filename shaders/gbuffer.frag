@@ -44,6 +44,9 @@ void main()
     vec4 alb = texture(sampler2D(TextureHeap[AlbedoIndex], SamplerHeap[1]), fTexcoords) * vec4(BaseColorFactor, 1.0);
     vec4 mr = texture(sampler2D(TextureHeap[MetallicRoughnessIndex], SamplerHeap[0]), fTexcoords);
 
+    if (alb.a < 0.25)
+        discard;
+
     mr.g *= MetallicFactor;
     mr.b *= RoughnessFactor;
 

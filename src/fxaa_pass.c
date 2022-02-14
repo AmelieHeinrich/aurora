@@ -57,6 +57,7 @@ void fxaa_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layouts[0] = &data->fxaa_set_layout;
         descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
         descriptor.set_layout_count = 2;
+        descriptor.depth_biased_enable = 0;
 
         rhi_init_graphics_pipeline(&data->fxaa_pipeline, &descriptor);
 

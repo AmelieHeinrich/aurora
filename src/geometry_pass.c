@@ -98,6 +98,7 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layout_count = 4;
         descriptor.shaders.vs = &vs;
         descriptor.shaders.ps = &fs;
+        descriptor.depth_biased_enable = 0;
 
         rhi_init_graphics_pipeline(&data->gbuffer_pipeline, &descriptor);
 
@@ -129,6 +130,7 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layout_count = 3;
         descriptor.shaders.vs = &vs;
         descriptor.shaders.ps = &fs;
+        descriptor.depth_biased_enable = 0;
 
         rhi_init_graphics_pipeline(&data->deferred_pipeline, &descriptor);
 
