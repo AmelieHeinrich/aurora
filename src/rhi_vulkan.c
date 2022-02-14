@@ -953,7 +953,7 @@ void rhi_init_graphics_pipeline(rhi_pipeline* pipeline, rhi_pipeline_descriptor*
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = descriptor->cull_mode;
     rasterizer.frontFace = descriptor->front_face;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthBiasEnable = descriptor->depth_biased_enable ? VK_TRUE : VK_FALSE;
     
     VkPipelineMultisampleStateCreateInfo multisampling = {0};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1725,7 +1725,7 @@ void rhi_cmd_start_render(rhi_command_buf* buf, rhi_render_begin info)
         depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         depth_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         depth_attachment.clearValue = depth_clear_value;
 
         rendering_info.pStencilAttachment = &depth_attachment;

@@ -112,6 +112,7 @@ struct rhi_pipeline_descriptor
     VkFrontFace front_face;
     b32 ccw;
     VkCompareOp depth_op;
+    b32 depth_biased_enable;
 
     i32 color_attachment_count;
     VkFormat depth_attachment_format;
