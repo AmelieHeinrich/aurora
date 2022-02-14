@@ -21,6 +21,8 @@ struct vertex
 typedef struct meshlet meshlet;
 struct meshlet
 {
+    hmm_vec4 cone;
+    hmm_vec4 sphere;
     u32 vertices[MAX_MESHLET_VERTICES];
     u8 indices[MAX_MESHLET_INDICES];
     u8 vertex_count;

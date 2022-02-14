@@ -11,6 +11,15 @@ internal rhi_descriptor_heap* s_image_heap;
 internal rhi_descriptor_set_layout s_descriptor_set_layout;
 internal rhi_descriptor_set_layout s_meshlet_set_layout;
 
+typedef struct aabb aabb;
+struct aabb
+{
+    hmm_vec3 min;
+    hmm_vec3 max;
+    hmm_vec3 extents;
+    hmm_vec3 center;
+};
+
 typedef struct meshlet_vector meshlet_vector;
 struct meshlet_vector
 {
@@ -277,6 +286,60 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
 
     if (ml.triangle_count)
         push_meshlet(&vec, ml);
+
+    for (u32 i = 0; i < vec.used; i++)
+    {
+        hmm_vec3 mean_normal;
+
+        aabb bbox;
+        f32 radius = 0.0f;
+        bbox.min = vertices[vec.meshlets[i].vertices[vec.meshlets[i].indices[0]]].position;
+        bbox.max = bbox.min;
+
+        for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
+        {
+            u32 a = vec.meshlets[i].indices[j];
+            const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
+
+            mean_normal = HMM_AddVec3(mean_normal, va->normals);
+
+            // Compute AABB
+
+            bbox.min.X = min(bbox.min.X, va->position.X);
+            bbox.min.Y = min(bbox.min.Y, va->position.Y);
+            bbox.min.Z = min(bbox.min.Z, va->position.Z);
+
+            bbox.max.X = max(bbox.max.X, va->position.X);
+            bbox.max.Y = max(bbox.max.Y, va->position.Y);
+            bbox.max.Z = max(bbox.max.Z, va->position.Z);
+        }
+        bbox.extents = HMM_DivideVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 2.0f);
+        bbox.center = HMM_AddVec3(bbox.min, bbox.extents);
+        mean_normal = HMM_NormalizeVec3(mean_normal);
+
+        f32 angular_span = 0.0f;
+
+        for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
+        {
+            u32 a = vec.meshlets[i].indices[j];
+            const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
+
+            angular_span = max(angular_span, acos(HMM_DotVec3(mean_normal, va->normals)));
+
+            f32 distance = sqrt(pow((bbox.center.X - va->position.X), 2) + pow((bbox.center.Y - va->position.Y), 2) + pow((bbox.center.Z - va->position.Z), 2));
+            radius = max(radius, distance);
+        }
+
+        vec.meshlets[i].cone.X = mean_normal.X;
+        vec.meshlets[i].cone.Y = mean_normal.Y;
+        vec.meshlets[i].cone.Z = mean_normal.Z;
+        vec.meshlets[i].cone.W = angular_span;
+
+        vec.meshlets[i].sphere.X = bbox.center.X;
+        vec.meshlets[i].sphere.Y = bbox.center.Y;
+        vec.meshlets[i].sphere.Z = bbox.center.Z;
+        vec.meshlets[i].sphere.W = radius;
+    }
 
     rhi_allocate_buffer(&pri->meshlet_buffer, vec.used * sizeof(meshlet), BUFFER_VERTEX);
     rhi_upload_buffer(&pri->meshlet_buffer, vec.meshlets, vec.used * sizeof(meshlet));

@@ -1,5 +1,7 @@
 #include "geometry_pass.h"
 
+#include "platform_layer.h"
+
 typedef struct geometry_pass geometry_pass;
 struct geometry_pass
 {
