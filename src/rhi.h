@@ -3,13 +3,7 @@
 
 /*
 Renderer TODOs:
-TODO: GLTF loading
-TODO: Render Graph
-TODO: (possibly) microui or cimgui?
 TODO: PBR environment maps
-TODO: Composite Pass
-TODO: Forward+ Rendering
-TODO: Mesh Shaders
 TODO: Shadows
 TODO: Global Illumination
 */
