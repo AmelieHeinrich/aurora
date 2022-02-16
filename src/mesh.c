@@ -290,8 +290,10 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     for (u32 i = 0; i < vec.used; i++)
     {
         hmm_vec3 mean_normal;
+        memset(&mean_normal, 0, sizeof(hmm_vec3));
 
         aabb bbox;
+        memset(&bbox, 0, sizeof(aabb));
         f32 radius = 0.0f;
         bbox.min = vertices[vec.meshlets[i].vertices[vec.meshlets[i].indices[0]]].position;
         bbox.max = bbox.min;

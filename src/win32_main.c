@@ -95,7 +95,8 @@ int main()
 		f32 dt = time - last_frame;
 		last_frame = time;
 
-		rge.camera.vp = camera.view_projection;
+		rge.camera.projection = camera.projection;
+		rge.camera.view = camera.view;
 		rge.camera.pos = camera.position;
 
 		rhi_begin();

@@ -8,6 +8,7 @@
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 const float pi_half = 1.57079;
+vec4 frustrum;
 
 struct Meshlet
 {
@@ -25,7 +26,8 @@ layout (binding = 1, set = 4) readonly buffer Meshlets
 };
 
 layout (binding = 0, set = 0) uniform Camera {
-	mat4 cam;
+	mat4 projection;
+	mat4 view;
 	vec3 pos;
 	float pad;
 } camera;
@@ -42,12 +44,42 @@ out taskNV block
 bool IsFrontFaceVisible(vec4 cone, vec4 sphere, vec3 view)
 {
 	vec3 sphere_center_dir = normalize(sphere.xyz - view);
+	return dot(cone.xyz, sphere_center_dir) < sin(min(cone.w, pi_half));
+}
 
-	float sin_cone_angle = sin(min(cone.w, pi_half));
-	return dot(cone.xyz, sphere_center_dir) < sin_cone_angle;
+bool FrustrumCull(vec4 sphere)
+{
+	vec3 center = sphere.xyz;
+	center = (camera.view * vec4(center, 1.0f)).xyz;
+	float radius = sphere.w;
+
+	bool visible = true;
+
+	visible = visible && center.z * frustrum.y - abs(center.x) * frustrum.x > -radius;
+	visible = visible && center.z * frustrum.w - abs(center.y) * frustrum.z > -radius;
+
+	return visible;
 }
 
 shared uint meshletCount;
+
+vec4 normalize_plane(vec4 p)
+{
+	return p / length(vec3(p.xyz));
+}
+
+void extract_planes()
+{
+	mat4 frustrum_matrix = transpose(camera.projection);
+
+	vec4 frustrum_x = normalize_plane(frustrum_matrix[3] + frustrum_matrix[0]);
+	vec4 frustrum_y = normalize_plane(frustrum_matrix[3] + frustrum_matrix[1]);
+
+	frustrum.x = frustrum_x.x;
+	frustrum.y = frustrum_x.z;
+	frustrum.z = frustrum_y.y;
+	frustrum.w = frustrum_y.z;
+}
 
 void main()
 {
@@ -55,9 +87,11 @@ void main()
 	uint mgi = gl_WorkGroupID.x;
 	uint mi = mgi * 32 + ti;
 
+	extract_planes();
+
 	vec4 view_origin = inverse(model.transform) * vec4(camera.pos, 1.0);
 
-	bool accept = IsFrontFaceVisible(meshlets[mi].cone, meshlets[mi].sphere, view_origin.xyz);
+	bool accept = FrustrumCull(meshlets[mi].sphere) || IsFrontFaceVisible(meshlets[mi].cone, meshlets[mi].sphere, view_origin.xyz);
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);
