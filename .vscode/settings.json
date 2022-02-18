@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "handmademath.h": "c"
+        "handmademath.h": "c",
+        "directxcollision.h": "c"
     }
 }

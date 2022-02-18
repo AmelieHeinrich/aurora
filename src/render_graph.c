@@ -128,6 +128,47 @@ void update_render_graph(render_graph* graph, render_graph_execute* execute)
     rhi_upload_buffer(&execute->camera_buffer, &execute->camera, sizeof(execute->camera));
     rhi_upload_buffer(&execute->light_buffer, &execute->light_info, sizeof(execute->light_info));
 
+    {
+        // update frustrum planes
+        hmm_mat4 matrix = HMM_MultiplyMat4(execute->camera.projection, execute->camera.view);
+
+        execute->camera.frustrum_planes[0].X = matrix.Elements[3][0] + matrix.Elements[0][0];
+		execute->camera.frustrum_planes[0].Y = matrix.Elements[3][1] + matrix.Elements[0][1];
+		execute->camera.frustrum_planes[0].Z = matrix.Elements[3][2] + matrix.Elements[0][2];
+		execute->camera.frustrum_planes[0].W = matrix.Elements[3][3] + matrix.Elements[0][3];
+
+		execute->camera.frustrum_planes[1].X = matrix.Elements[3][0] - matrix.Elements[0][0];
+		execute->camera.frustrum_planes[1].Y = matrix.Elements[3][1] - matrix.Elements[0][1];
+		execute->camera.frustrum_planes[1].Z = matrix.Elements[3][2] - matrix.Elements[0][2];
+		execute->camera.frustrum_planes[1].W = matrix.Elements[3][3] - matrix.Elements[0][3];
+
+		execute->camera.frustrum_planes[2].X = matrix.Elements[3][0] - matrix.Elements[1][0];
+		execute->camera.frustrum_planes[2].Y = matrix.Elements[3][1] - matrix.Elements[1][1];
+		execute->camera.frustrum_planes[2].Z = matrix.Elements[3][2] - matrix.Elements[1][2];
+		execute->camera.frustrum_planes[2].W = matrix.Elements[3][3] - matrix.Elements[1][3];
+
+		execute->camera.frustrum_planes[3].X = matrix.Elements[3][0] + matrix.Elements[1][0];
+		execute->camera.frustrum_planes[3].Y = matrix.Elements[3][1] + matrix.Elements[1][1];
+		execute->camera.frustrum_planes[3].Z = matrix.Elements[3][2] + matrix.Elements[1][2];
+	    execute->camera.frustrum_planes[3].W = matrix.Elements[3][3] + matrix.Elements[1][3];
+
+		execute->camera.frustrum_planes[4].X = matrix.Elements[3][0] + matrix.Elements[2][0];
+		execute->camera.frustrum_planes[4].Y = matrix.Elements[3][1] + matrix.Elements[2][1];
+		execute->camera.frustrum_planes[4].Z = matrix.Elements[3][2] + matrix.Elements[2][2];
+		execute->camera.frustrum_planes[4].W = matrix.Elements[3][3] + matrix.Elements[2][3];
+
+		execute->camera.frustrum_planes[5].X = matrix.Elements[3][0] - matrix.Elements[2][0];
+		execute->camera.frustrum_planes[5].Y = matrix.Elements[3][1] - matrix.Elements[2][1];
+		execute->camera.frustrum_planes[5].Z = matrix.Elements[3][2] - matrix.Elements[2][2];
+		execute->camera.frustrum_planes[5].W = matrix.Elements[3][3] - matrix.Elements[2][3];
+
+		for (i32 i = 0; i < 6; i++)
+		{
+			f32 length = HMM_LengthSquaredVec4(execute->camera.frustrum_planes[i]);
+            execute->camera.frustrum_planes[i] = HMM_DivideVec4f(execute->camera.frustrum_planes[i], length);
+		}
+    }
+
     for (u32 i = 0; i < graph->node_count; i++)
         graph->nodes[i]->update(graph->nodes[i], execute);
 }

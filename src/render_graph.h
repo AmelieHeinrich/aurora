@@ -63,7 +63,10 @@ struct render_graph_execute
         hmm_mat4 view;
         hmm_vec3 pos;
         f32 pad;
+        hmm_vec4 frustrum_planes[6];
     } camera;
+
+    b32 freeze_frustrum;
 };
 
 struct render_graph_node_input

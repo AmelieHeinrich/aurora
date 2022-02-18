@@ -39,6 +39,7 @@ layout (binding = 0, set = 0) uniform SceneData {
 	mat4 view;
 	vec3 camera_position;
 	float padding0;
+	vec4 frustrum_planes[6];
 } scene;
 
 in taskNV block

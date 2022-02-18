@@ -315,7 +315,7 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
             bbox.max.Y = max(bbox.max.Y, va->position.Y);
             bbox.max.Z = max(bbox.max.Z, va->position.Z);
         }
-        bbox.extents = HMM_DivideVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 2.0f);
+        bbox.extents = HMM_SubtractVec3(bbox.max, bbox.min);
         bbox.center = HMM_AddVec3(bbox.min, bbox.extents);
         mean_normal = HMM_NormalizeVec3(mean_normal);
 
