@@ -27,6 +27,12 @@ layout (binding = 0, set = 2) uniform Lights {
     vec3 _light_pad;
 };
 
+layout (binding = 0, set = 3) uniform RenderParams {
+    bool show_meshlets;
+    bool shade_meshlets;
+    vec2 pad;
+} params;
+
 layout (push_constant) uniform CameraConstants {
     vec3 fCameraPos;
     float pad;
@@ -135,5 +141,12 @@ void main()
     vec3 ambient = vec3(0.03) * Diffuse.rgb * ao;
     vec3 color = ambient + Lo;
 
-    OutColor = vec4(color, 1.0);
+    vec3 final_color = color;
+
+    if (params.show_meshlets)
+        final_color = Diffuse.xyz;
+    if (params.shade_meshlets)
+        final_color = color;
+
+    OutColor = vec4(final_color, 1.0);
 }

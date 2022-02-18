@@ -5,6 +5,12 @@
 typedef struct geometry_pass geometry_pass;
 struct geometry_pass
 {
+    struct {
+        b32 show_meshlets;
+        b32 shade_meshlets;
+        hmm_vec2 pad;
+    } parameters;
+
     b32 first_render;
 
     rhi_sampler nearest_sampler;
@@ -19,6 +25,10 @@ struct geometry_pass
     rhi_image gMetallicRoughness;
 
     rhi_buffer screen_vertex_buffer;
+    rhi_buffer render_params_buffer;
+
+    rhi_descriptor_set_layout params_set_layout;
+    rhi_descriptor_set params_set;
 
     rhi_descriptor_set_layout deferred_set_layout;
     rhi_descriptor_set deferred_set;
@@ -27,6 +37,8 @@ struct geometry_pass
 void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
 {
     geometry_pass* data = node->private_data;
+    data->parameters.show_meshlets = 0;
+    data->parameters.shade_meshlets = 0;
     
     f32 quad_vertices[] = {
 		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
@@ -37,6 +49,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
 
     rhi_allocate_buffer(&data->screen_vertex_buffer, sizeof(quad_vertices), BUFFER_VERTEX);
     rhi_upload_buffer(&data->screen_vertex_buffer, quad_vertices, sizeof(quad_vertices));
+
+    rhi_allocate_buffer(&data->render_params_buffer, sizeof(data->parameters), BUFFER_UNIFORM);
 
     data->nearest_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	data->nearest_sampler.filter = VK_FILTER_NEAREST;
@@ -70,6 +84,14 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gNormal, 1);
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gAlbedo, 2);
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gMetallicRoughness, 3);
+
+        data->params_set_layout.binding = 0;
+        data->params_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
+        data->params_set_layout.descriptor_count = 1;
+        rhi_init_descriptor_set_layout(&data->params_set_layout);
+
+        rhi_init_descriptor_set(&data->params_set, &data->params_set_layout);
+        rhi_descriptor_set_write_buffer(&data->params_set, &data->render_params_buffer, sizeof(data->parameters), 0);
     }
 
     {
@@ -100,7 +122,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layouts[2] = rhi_get_sampler_heap_set_layout();
         descriptor.set_layouts[3] = mesh_loader_get_descriptor_set_layout();
         descriptor.set_layouts[4] = mesh_loader_get_geometry_descriptor_set_layout();
-        descriptor.set_layout_count = 5;
+        descriptor.set_layouts[5] = &data->params_set_layout;
+        descriptor.set_layout_count = 6;
         descriptor.shaders.ts = &ts;
         descriptor.shaders.ms = &ms;
         descriptor.shaders.ps = &fs;
@@ -134,7 +157,8 @@ void geometry_pass_init(render_graph_node* node, render_graph_execute* execute)
         descriptor.set_layouts[0] = &data->deferred_set_layout;
         descriptor.set_layouts[1] = rhi_get_sampler_heap_set_layout();
         descriptor.set_layouts[2] = &execute->light_descriptor_set_layout;
-        descriptor.set_layout_count = 3;
+        descriptor.set_layouts[3] = &data->params_set_layout;
+        descriptor.set_layout_count = 4;
         descriptor.shaders.vs = &vs;
         descriptor.shaders.ps = &fs;
         descriptor.depth_biased_enable = 0;
@@ -152,7 +176,17 @@ void geometry_pass_update(render_graph_node* node, render_graph_execute* execute
 {
     geometry_pass* data = node->private_data;
 
+    if (aurora_platform_key_pressed(KEY_Y))
+        data->parameters.show_meshlets = 1;
+    if (aurora_platform_key_pressed(KEY_N))
+        data->parameters.show_meshlets = 0;
+    if (aurora_platform_key_pressed(KEY_O))
+        data->parameters.shade_meshlets = 1;
+    if (aurora_platform_key_pressed(KEY_P))
+        data->parameters.shade_meshlets = 0;
+
     rhi_command_buf* cmd_buf = rhi_get_swapchain_cmd_buf();
+    rhi_upload_buffer(&data->render_params_buffer, &data->parameters, sizeof(data->parameters));
 
     {
         rhi_render_begin begin;
@@ -186,6 +220,7 @@ void geometry_pass_update(render_graph_node* node, render_graph_execute* execute
         rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &execute->camera_descriptor_set, 0);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->gbuffer_pipeline, &execute->image_heap, 1);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->gbuffer_pipeline, &execute->sampler_heap, 2);
+        rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &data->params_set, 5);
 
         for (i32 i = 0; i < execute->drawable_count; i++)
         {
@@ -233,6 +268,7 @@ void geometry_pass_update(render_graph_node* node, render_graph_execute* execute
         rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &data->deferred_set, 0);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->deferred_pipeline, &execute->sampler_heap, 1);
         rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &execute->light_descriptor_set, 2);
+        rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &data->params_set, 3);
         rhi_cmd_set_push_constants(cmd_buf, &data->deferred_pipeline, &temp, sizeof(hmm_vec4));
         rhi_cmd_set_vertex_buffer(cmd_buf, &data->screen_vertex_buffer);
         rhi_cmd_draw(cmd_buf, 4);
@@ -273,9 +309,12 @@ void geometry_pass_free(render_graph_node* node, render_graph_execute* execute)
     rhi_free_pipeline(&data->gbuffer_pipeline);
     rhi_free_sampler(&data->linear_sampler);
     rhi_free_sampler(&data->nearest_sampler);
+    rhi_free_descriptor_set(&data->params_set);
+    rhi_free_descriptor_set_layout(&data->params_set_layout);
     rhi_free_descriptor_set(&data->deferred_set);
     rhi_free_descriptor_set_layout(&data->deferred_set_layout);
     rhi_free_buffer(&data->screen_vertex_buffer);
+    rhi_free_buffer(&data->render_params_buffer);
 
     free(data);
 }

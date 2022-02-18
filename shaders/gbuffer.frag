@@ -24,6 +24,11 @@ layout (binding = 0, set = 3) uniform BindlessMaterial {
     float RoughnessFactor;
 };
 
+layout (binding = 0, set = 5) uniform RenderParams {
+    bool show_meshlets;
+    vec3 pad;
+} params;
+
 vec3 GetNormalFromMap()
 {
     vec3 tangentNormal = texture(sampler2D(TextureHeap[NormalIndex], SamplerHeap[0]), FragmentIn.fTexcoords).xyz * 2.0 - 1.0;
@@ -55,6 +60,6 @@ void main()
 
     gPosition = FragmentIn.fPosition;
     gNormal = N;
-    gAlbedo = alb;
+    gAlbedo = params.show_meshlets ? vec4(FragmentIn.fMeshletColor, 1.0) : alb;
     gMetallicRoughness = mr;
 }
