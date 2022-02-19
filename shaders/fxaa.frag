@@ -69,7 +69,7 @@ void main()
   	vec2 uv2 = OutUV;
 
     vec4 uv = vec4( uv2, uv2 - (rcpFrame * (0.5 + FXAA_THRESHOLD)));
-	vec3 col = apply_fxaa(uv, color_image, SamplerHeap[0], 1.0 / settings.screen_size.xy);
+	vec3 col = apply_fxaa(uv, color_image, SamplerHeap[1], 1.0 / settings.screen_size.xy);
     
     const mat3 inputMatrix = mat3
     (

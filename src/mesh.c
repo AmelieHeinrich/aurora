@@ -229,6 +229,8 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     rhi_allocate_buffer(&pri->index_buffer, index_size, BUFFER_INDEX);
     rhi_upload_buffer(&pri->index_buffer, indices, index_size);
 
+    // MAKE MESHLETS
+
     meshlet_vector vec;
     init_meshlet_vector(&vec, 256);
 
@@ -287,16 +289,15 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     if (ml.triangle_count)
         push_meshlet(&vec, ml);
 
+    // Bounding volumes (cone and sphere)
+
     for (u32 i = 0; i < vec.used; i++)
     {
         hmm_vec3 mean_normal;
         memset(&mean_normal, 0, sizeof(hmm_vec3));
-
         aabb bbox;
         memset(&bbox, 0, sizeof(aabb));
-        f32 radius = 0.0f;
-        bbox.min = vertices[vec.meshlets[i].vertices[vec.meshlets[i].indices[0]]].position;
-        bbox.max = bbox.min;
+        f32 radius = 1.0f;
 
         for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
         {
@@ -304,18 +305,11 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
             const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
 
             mean_normal = HMM_AddVec3(mean_normal, va->normals);
-
-            // Compute AABB
-
-            bbox.min.X = min(bbox.min.X, va->position.X);
-            bbox.min.Y = min(bbox.min.Y, va->position.Y);
-            bbox.min.Z = min(bbox.min.Z, va->position.Z);
-
-            bbox.max.X = max(bbox.max.X, va->position.X);
-            bbox.max.Y = max(bbox.max.Y, va->position.Y);
-            bbox.max.Z = max(bbox.max.Z, va->position.Z);
+            bbox.min = HMM_MinVec3(bbox.min, va->position);
+            bbox.max = HMM_MaxVec3(bbox.max, va->position);
         }
-        bbox.extents = HMM_SubtractVec3(bbox.max, bbox.min);
+        
+        bbox.extents = HMM_DivideVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 2.0f);
         bbox.center = HMM_AddVec3(bbox.min, bbox.extents);
         mean_normal = HMM_NormalizeVec3(mean_normal);
 
@@ -328,7 +322,7 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
 
             angular_span = max(angular_span, acos(HMM_DotVec3(mean_normal, va->normals)));
 
-            f32 distance = sqrt(pow((bbox.center.X - va->position.X), 2) + pow((bbox.center.Y - va->position.Y), 2) + pow((bbox.center.Z - va->position.Z), 2));
+            f32 distance = HMM_DistanceVec3(bbox.center, va->position);
             radius = max(radius, distance);
         }
 

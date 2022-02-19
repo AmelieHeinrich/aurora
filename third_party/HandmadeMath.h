@@ -1028,6 +1028,34 @@ HMM_INLINE hmm_bool HMM_PREFIX(EqualsVec3)(hmm_vec3 Left, hmm_vec3 Right)
     return (Result);
 }
 
+COVERAGE(HMM_MaxVec3, 1)
+HMM_INLINE hmm_vec3 HMM_PREFIX(MaxVec3)(hmm_vec3 Left, hmm_vec3 Right)
+{
+    ASSERT_COVERED(HMM_MaxVec3);
+
+    hmm_vec3 Result;
+
+    Result.X = HMM_MAX(Left.X, Right.X);
+    Result.Y = HMM_MAX(Left.Y, Right.Y);
+    Result.Z = HMM_MAX(Left.Z, Right.Z);
+
+    return (Result);
+}
+
+COVERAGE(HMM_MinVec3, 1)
+HMM_INLINE hmm_vec3 HMM_PREFIX(MinVec3)(hmm_vec3 Left, hmm_vec3 Right)
+{
+    ASSERT_COVERED(HMM_MinVec3);
+
+    hmm_vec3 Result;
+
+    Result.X = HMM_MIN(Left.X, Right.X);
+    Result.Y = HMM_MIN(Left.Y, Right.Y);
+    Result.Z = HMM_MIN(Left.Z, Right.Z);
+
+    return (Result);
+}
+
 COVERAGE(HMM_EqualsVec4, 1)
 HMM_INLINE hmm_bool HMM_PREFIX(EqualsVec4)(hmm_vec4 Left, hmm_vec4 Right)
 {
@@ -1054,6 +1082,16 @@ HMM_INLINE float HMM_PREFIX(DotVec3)(hmm_vec3 VecOne, hmm_vec3 VecTwo)
     ASSERT_COVERED(HMM_DotVec3);
 
     float Result = (VecOne.X * VecTwo.X) + (VecOne.Y * VecTwo.Y) + (VecOne.Z * VecTwo.Z);
+
+    return (Result);
+}
+
+COVERAGE(HMM_DistanceVec3, 1)
+HMM_INLINE float HMM_PREFIX(DistanceVec3)(hmm_vec3 VecOne, hmm_vec3 VecTwo)
+{
+    ASSERT_COVERED(HMM_DistanceVec3);
+
+    float Result = HMM_SQRTF(HMM_Power(VecTwo.X - VecOne.X, 2) + HMM_Power(VecTwo.Y - VecOne.Y, 2) + HMM_Power(VecTwo.Z - VecOne.Z, 2));
 
     return (Result);
 }

@@ -61,7 +61,7 @@ void main()
 
 	// NOTE: FrustrumCull doesn't work.
 
-	bool accept = true; // FrustrumCull(meshlets[mi].sphere)
+	bool accept = FrustrumCull(meshlets[mi].sphere);
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);
