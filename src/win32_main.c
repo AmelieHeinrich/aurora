@@ -108,6 +108,9 @@ int main()
 		fps_camera_input(&camera, dt);
 		fps_camera_update(&camera, dt);
 
+		for (i32 i = 0; i < 6; i++)
+			rge.camera.frustrum_planes[i] = camera.frustum_planes[i];
+
 		aurora_platform_update_window();
 	}
 	

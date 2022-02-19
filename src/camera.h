@@ -37,6 +37,8 @@ struct fps_camera
     f32 friction;
     hmm_vec3 velocity;
     f32 max_velocity;
+
+    hmm_vec4 frustum_planes[6];
 };
 
 void fps_camera_init(fps_camera* camera);
