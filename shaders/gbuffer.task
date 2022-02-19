@@ -45,7 +45,7 @@ bool FrustrumCull(vec4 sphere)
 {
 	for (int i = 0; i < 6; i++)
 	{
-		if (dot(camera.frustrum_planes[i].xyz, sphere.xyz) - camera.frustrum_planes[i].w > -sphere.w)
+		if (dot(sphere.xyz, camera.frustrum_planes[i].xyz) + camera.frustrum_planes[i].w + sphere.w < 0.0)
 			return false;
 	}
 	return true;
@@ -59,7 +59,7 @@ void main()
 	uint mgi = gl_WorkGroupID.x;
 	uint mi = mgi * 32 + ti;
 
-	bool accept = FrustrumCull(meshlets[mi].sphere);
+	bool accept = true;
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);

@@ -50,54 +50,72 @@ void fps_camera_update(fps_camera* camera, f32 dt)
     camera->projection = HMM_Perspective(75.0f, camera->width / camera->height, 0.01f, 100.0f);
     camera->view_projection = HMM_MultiplyMat4(camera->projection, camera->view);
 
-#if 1
+#if 0
     const f32 halfVSide = 100.0f * tanf(HMM_ToRadians(75.0f) * .5f);
     const f32 halfHSide = halfVSide * (camera->width / camera->height);
     hmm_vec3 front_mult_far = HMM_MultiplyVec3f(camera->front, 100.0f);
 
+    // Near plane
     camera->frustum_planes[0].XYZ = HMM_NormalizeVec3(camera->front);
-    camera->frustum_planes[1].XYZ = HMM_NormalizeVec3(HMM_Vec3(-camera->front.X, -camera->front.Y, -camera->front.Z));
-    camera->frustum_planes[2].XYZ = HMM_NormalizeVec3(HMM_Cross(camera->up, HMM_AddVec3(front_mult_far, HMM_MultiplyVec3f(camera->right, halfHSide))));
-    camera->frustum_planes[3].XYZ = HMM_NormalizeVec3(HMM_Cross(HMM_SubtractVec3(front_mult_far, HMM_MultiplyVec3f(camera->right, halfHSide)), camera->up));
-    camera->frustum_planes[4].XYZ = HMM_NormalizeVec3(HMM_Cross(camera->right, HMM_SubtractVec3(front_mult_far, HMM_MultiplyVec3f(camera->up, halfVSide))));
-    camera->frustum_planes[5].XYZ = HMM_NormalizeVec3(HMM_Cross(HMM_AddVec3(front_mult_far, HMM_MultiplyVec3f(camera->up, halfVSide)), camera->right));
-
     camera->frustum_planes[0].W = HMM_DotVec3(camera->frustum_planes[0].XYZ, HMM_AddVec3(camera->position, HMM_MultiplyVec3(HMM_Vec3(0.01f, 0.01f, 0.01f), camera->front)));
+
+    // Far plane
+    camera->frustum_planes[1].XYZ = HMM_NormalizeVec3(HMM_Vec3(-camera->front.X, -camera->front.Y, -camera->front.Z));
     camera->frustum_planes[1].W = HMM_DotVec3(camera->frustum_planes[1].XYZ, HMM_AddVec3(camera->position, front_mult_far));
+
+    // Right plane
+    camera->frustum_planes[2].XYZ = HMM_NormalizeVec3(HMM_Cross(camera->up, HMM_AddVec3(front_mult_far, HMM_MultiplyVec3f(camera->right, halfHSide))));
     camera->frustum_planes[2].W = HMM_DotVec3(camera->frustum_planes[2].XYZ, camera->position);
+
+    // Left plane
+    camera->frustum_planes[3].XYZ = HMM_NormalizeVec3(HMM_Cross(HMM_SubtractVec3(front_mult_far, HMM_MultiplyVec3f(camera->right, halfHSide)), camera->up));
     camera->frustum_planes[3].W = HMM_DotVec3(camera->frustum_planes[3].XYZ, camera->position);
+
+    // Top plane
+    camera->frustum_planes[4].XYZ = HMM_NormalizeVec3(HMM_Cross(camera->right, HMM_SubtractVec3(front_mult_far, HMM_MultiplyVec3f(camera->up, halfVSide))));
     camera->frustum_planes[4].W = HMM_DotVec3(camera->frustum_planes[4].XYZ, camera->position);
+
+    // Bottom plane
+    camera->frustum_planes[5].XYZ = HMM_NormalizeVec3(HMM_Cross(HMM_AddVec3(front_mult_far, HMM_MultiplyVec3f(camera->up, halfVSide)), camera->right));
     camera->frustum_planes[5].W = HMM_DotVec3(camera->frustum_planes[5].XYZ, camera->position);
 #else
     hmm_mat4 clip_matrix = camera->view_projection;
 
+    // Left
     camera->frustum_planes[0].X = clip_matrix.Elements[3][0] + clip_matrix.Elements[0][0];
     camera->frustum_planes[0].Y = clip_matrix.Elements[3][1] + clip_matrix.Elements[0][1];
     camera->frustum_planes[0].Z = clip_matrix.Elements[3][2] + clip_matrix.Elements[0][2];
     camera->frustum_planes[0].W = clip_matrix.Elements[3][3] + clip_matrix.Elements[0][3];
+
+    // Right
     camera->frustum_planes[1].X = clip_matrix.Elements[3][0] - clip_matrix.Elements[0][0];
     camera->frustum_planes[1].Y = clip_matrix.Elements[3][1] - clip_matrix.Elements[0][1];
     camera->frustum_planes[1].Z = clip_matrix.Elements[3][2] - clip_matrix.Elements[0][2];
     camera->frustum_planes[1].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[0][3];
+
+    // Top
     camera->frustum_planes[2].X = clip_matrix.Elements[3][0] - clip_matrix.Elements[1][0];
     camera->frustum_planes[2].Y = clip_matrix.Elements[3][1] - clip_matrix.Elements[1][1];
     camera->frustum_planes[2].Z = clip_matrix.Elements[3][2] - clip_matrix.Elements[1][2];
     camera->frustum_planes[2].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[1][3];
+
+    // Bottom
     camera->frustum_planes[3].X = clip_matrix.Elements[3][0] + clip_matrix.Elements[1][0];
     camera->frustum_planes[3].Y = clip_matrix.Elements[3][1] + clip_matrix.Elements[1][1];
     camera->frustum_planes[3].Z = clip_matrix.Elements[3][2] + clip_matrix.Elements[1][2];
     camera->frustum_planes[3].W = clip_matrix.Elements[3][3] + clip_matrix.Elements[1][3];
+
+    // Near
     camera->frustum_planes[4].X = clip_matrix.Elements[3][0] + clip_matrix.Elements[2][0];
     camera->frustum_planes[4].Y = clip_matrix.Elements[3][1] + clip_matrix.Elements[2][1];
     camera->frustum_planes[4].Z = clip_matrix.Elements[3][2] + clip_matrix.Elements[2][2];
     camera->frustum_planes[4].W = clip_matrix.Elements[3][3] + clip_matrix.Elements[2][3];
+
+    // Far
     camera->frustum_planes[5].X = clip_matrix.Elements[3][0] - clip_matrix.Elements[2][0];
     camera->frustum_planes[5].Y = clip_matrix.Elements[3][1] - clip_matrix.Elements[2][1];
     camera->frustum_planes[5].Z = clip_matrix.Elements[3][2] - clip_matrix.Elements[2][2];
     camera->frustum_planes[5].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[2][3];
-
-    for (i32 i = 0; i < 6; i++)
-        camera->frustum_planes[i].XYZ = HMM_NormalizeVec3(camera->frustum_planes[i].XYZ);
 #endif
 }
 
