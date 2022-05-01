@@ -1,6 +1,28 @@
 {
     "files.associations": {
         "handmademath.h": "c",
-        "directxcollision.h": "c"
+        "directxcollision.h": "c",
+        "algorithm": "c",
+        "atomic": "c",
+        "charconv": "c",
+        "chrono": "c",
+        "compare": "c",
+        "condition_variable": "c",
+        "format": "c",
+        "limits": "c",
+        "list": "c",
+        "mutex": "c",
+        "shared_mutex": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "type_traits": "c",
+        "xhash": "c",
+        "xlocale": "c",
+        "xlocbuf": "c",
+        "xlocmon": "c",
+        "xlocnum": "c",
+        "xstring": "c",
+        "xtree": "c",
+        "xutility": "c"
     }
 }

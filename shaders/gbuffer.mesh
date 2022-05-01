@@ -21,7 +21,6 @@ layout (binding = 0, set = 4) readonly buffer Vertices
 
 struct Meshlet
 {
-	vec4 cone;
 	vec4 sphere;
 	uint vertices[64];   
     uint indices_packed[124*3/4];   

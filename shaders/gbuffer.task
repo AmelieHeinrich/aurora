@@ -11,7 +11,6 @@ const float pi_half = 1.57079;
 
 struct Meshlet
 {
-	vec4 cone;
 	vec4 sphere;
 	uint vertices[64];   
     uint indices_packed[124*3/4];   
@@ -41,14 +40,14 @@ out taskNV block
 	uint meshletIndices[32];
 };
 
-bool FrustrumCull(vec4 sphere)
+bool InsideFrustum(vec4 sphere)
 {
-	for (int i = 0; i < 6; i++)
-	{
-		if (dot(sphere.xyz, camera.frustrum_planes[i].xyz) + camera.frustrum_planes[i].w + sphere.w < 0.0)
-			return false;
-	}
-	return true;
+	return (dot(camera.frustrum_planes[0].xyz, sphere.xyz) - camera.frustrum_planes[0].w > -sphere.w)
+	    && (dot(camera.frustrum_planes[1].xyz, sphere.xyz) - camera.frustrum_planes[1].w > -sphere.w)
+		&& (dot(camera.frustrum_planes[2].xyz, sphere.xyz) - camera.frustrum_planes[2].w > -sphere.w)
+		&& (dot(camera.frustrum_planes[3].xyz, sphere.xyz) - camera.frustrum_planes[3].w > -sphere.w)
+		&& (dot(camera.frustrum_planes[4].xyz, sphere.xyz) - camera.frustrum_planes[4].w > -sphere.w)
+		&& (dot(camera.frustrum_planes[5].xyz, sphere.xyz) - camera.frustrum_planes[5].w > -sphere.w);
 }
 
 shared uint meshletCount;
@@ -59,7 +58,7 @@ void main()
 	uint mgi = gl_WorkGroupID.x;
 	uint mi = mgi * 32 + ti;
 
-	bool accept = true;
+	bool accept = InsideFrustum(meshlets[mi].sphere);
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);

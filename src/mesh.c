@@ -289,7 +289,7 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     if (ml.triangle_count)
         push_meshlet(&vec, ml);
 
-    // Bounding volumes (cone and sphere)
+    // Bounding Sphere
 
     for (u32 i = 0; i < vec.used; i++)
     {
@@ -300,37 +300,26 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
         memset(&bbox, 0, sizeof(aabb));
 
         bbox.min = HMM_Vec3(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX);
-        bbox.max = HMM_Vec3(0.0f, 0.0f, 0.0f);
+        bbox.max = HMM_Vec3(FLT_MIN, FLT_MIN, FLT_MIN);
 
         for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
         {
             u32 a = vec.meshlets[i].indices[j];
             const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
 
-            mean_normal = HMM_AddVec3(mean_normal, va->normals);
-            bbox.min = HMM_MinVec3(bbox.min, va->position);
-            bbox.max = HMM_MaxVec3(bbox.max, va->position);
+            bbox.min = HMM_MinVec3(va->position, bbox.min);
+            bbox.max = HMM_MaxVec3(va->position, bbox.max);
         }
+
+        vec.meshlets[i].sphere.XYZ = HMM_DivideVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 2.0f);
         
-        mean_normal = HMM_NormalizeVec3(mean_normal);
-
-        f32 angular_span = 0.0f;
-
         for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
         {
             u32 a = vec.meshlets[i].indices[j];
             const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
 
-            angular_span = max(angular_span, acos(HMM_DotVec3(mean_normal, va->normals)));
+            vec.meshlets[i].sphere.W = max(vec.meshlets[i].sphere.W, HMM_DistanceVec3(vec.meshlets[i].sphere.XYZ, va->position));
         }
-
-        hmm_vec3 sphere_center = HMM_DivideVec3f(HMM_AddVec3(bbox.max, bbox.min), 2.0f);
-
-        vec.meshlets[i].cone.XYZ = mean_normal;
-        vec.meshlets[i].cone.W = angular_span;
-
-        vec.meshlets[i].sphere.XYZ = sphere_center;
-        vec.meshlets[i].sphere.W = HMM_LengthVec3(HMM_SubtractVec3(bbox.min, bbox.max));
     }
 
     rhi_allocate_buffer(&pri->meshlet_buffer, vec.used * sizeof(meshlet), BUFFER_VERTEX);

@@ -16,6 +16,7 @@
 
 global fps_camera camera;
 global f64 last_frame;
+global b32 update_frustum = 1;
 
 global render_graph rg;
 global render_graph_execute rge;
@@ -99,6 +100,9 @@ int main()
 		rge.camera.view = camera.view;
 		rge.camera.pos = camera.position;
 
+		if (aurora_platform_key_pressed(KEY_W))
+			update_frustum = 0;
+
 		rhi_begin();
 		update_render_graph(&rg, &rge);
 		rhi_end();
@@ -107,9 +111,16 @@ int main()
 
 		fps_camera_input(&camera, dt);
 		fps_camera_update(&camera, dt);
+		if (update_frustum)
+			fps_camera_update_frustum(&camera);
 
 		for (i32 i = 0; i < 6; i++)
+		{
 			rge.camera.frustrum_planes[i] = camera.frustum_planes[i];
+
+			printf("%f, %f, %f, %f\n", rge.camera.frustrum_planes[i].X, rge.camera.frustrum_planes[i].Y, rge.camera.frustrum_planes[i].Z, rge.camera.frustrum_planes[i].W);
+		}
+		printf("\n");
 
 		aurora_platform_update_window();
 	}
