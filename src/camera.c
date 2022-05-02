@@ -64,7 +64,8 @@ void fps_camera_update(fps_camera* camera, f32 dt)
 
 void fps_camera_update_frustum(fps_camera* camera)
 {
-    const f32 half_v_side = 10000.0f * tanf(HMM_ToRadians(75.0f) * .5f);
+#if 1
+    const f32 half_v_side = 10000.0f * tanf(HMM_ToRadians(75.0f) * 0.5f);
     const f32 half_h_side = half_v_side * (camera->width / camera->height);
     const hmm_vec3 front_mult_far = HMM_MultiplyVec3f(camera->front, 10000.0f);
 
@@ -105,6 +106,42 @@ void fps_camera_update_frustum(fps_camera* camera)
 
     camera->frustum_planes[5].XYZ = HMM_NormalizeVec3(camera->view_frustum.bottom.norm);
     camera->frustum_planes[5].W = HMM_DotVec3(camera->frustum_planes[5].XYZ, camera->view_frustum.bottom.point);
+#else
+    hmm_mat4 clip_matrix = HMM_MultiplyMat4(camera->projection, camera->view);
+
+    camera->frustum_planes[0].X = clip_matrix.Elements[0][3] + clip_matrix.Elements[0][0];
+    camera->frustum_planes[0].Y = clip_matrix.Elements[1][3] + clip_matrix.Elements[1][0];
+    camera->frustum_planes[0].Z = clip_matrix.Elements[2][3] + clip_matrix.Elements[2][0];
+    camera->frustum_planes[0].W = clip_matrix.Elements[3][3] + clip_matrix.Elements[3][0];
+    camera->frustum_planes[1].X = clip_matrix.Elements[0][3] - clip_matrix.Elements[0][0];
+    camera->frustum_planes[1].Y = clip_matrix.Elements[1][3] - clip_matrix.Elements[1][0];
+    camera->frustum_planes[1].Z = clip_matrix.Elements[2][3] - clip_matrix.Elements[2][0];
+    camera->frustum_planes[1].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[3][0];
+    camera->frustum_planes[2].X = clip_matrix.Elements[0][3] - clip_matrix.Elements[0][1];
+    camera->frustum_planes[2].Y = clip_matrix.Elements[1][3] - clip_matrix.Elements[1][1];
+    camera->frustum_planes[2].Z = clip_matrix.Elements[2][3] - clip_matrix.Elements[2][1];
+    camera->frustum_planes[2].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[3][1];
+    camera->frustum_planes[3].X = clip_matrix.Elements[0][3] + clip_matrix.Elements[0][1];
+    camera->frustum_planes[3].Y = clip_matrix.Elements[1][3] + clip_matrix.Elements[1][1];
+    camera->frustum_planes[3].Z = clip_matrix.Elements[2][3] + clip_matrix.Elements[2][1];
+    camera->frustum_planes[3].W = clip_matrix.Elements[3][3] + clip_matrix.Elements[3][1];
+    camera->frustum_planes[4].X = clip_matrix.Elements[0][2];
+    camera->frustum_planes[4].Y = clip_matrix.Elements[1][2];
+    camera->frustum_planes[4].Z = clip_matrix.Elements[2][2];
+    camera->frustum_planes[4].W = clip_matrix.Elements[3][2];
+    camera->frustum_planes[5].X = clip_matrix.Elements[0][3] - clip_matrix.Elements[0][2];
+    camera->frustum_planes[5].Y = clip_matrix.Elements[1][3] - clip_matrix.Elements[1][2];
+    camera->frustum_planes[5].Z = clip_matrix.Elements[2][3] - clip_matrix.Elements[2][2];
+    camera->frustum_planes[5].W = clip_matrix.Elements[3][3] - clip_matrix.Elements[3][2];
+
+    for (u32 i = 0; i < 6; i++)
+    {
+        hmm_vec4* plane = &camera->frustum_planes[i];
+
+        f32 length = sqrtf(plane->X * plane->X + plane->Y * plane->Y + plane->Z * plane->Z);
+        *plane = HMM_DivideVec4f(*plane, length);
+    }
+#endif 
 }
 
 void fps_camera_input(fps_camera* camera, f32 dt)

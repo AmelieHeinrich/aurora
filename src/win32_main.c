@@ -11,8 +11,8 @@
 #include <time.h>
 
 #define TEST_LIGHT_COUNT 64
-#define TEST_MODEL_SPONZA 0
-#define TEST_MODEL_HELMET 1
+#define TEST_MODEL_SPONZA 1
+#define TEST_MODEL_HELMET 0
 
 global fps_camera camera;
 global f64 last_frame;
@@ -115,12 +115,7 @@ int main()
 			fps_camera_update_frustum(&camera);
 
 		for (i32 i = 0; i < 6; i++)
-		{
 			rge.camera.frustrum_planes[i] = camera.frustum_planes[i];
-
-			printf("%f, %f, %f, %f\n", rge.camera.frustrum_planes[i].X, rge.camera.frustrum_planes[i].Y, rge.camera.frustrum_planes[i].Z, rge.camera.frustrum_planes[i].W);
-		}
-		printf("\n");
 
 		aurora_platform_update_window();
 	}

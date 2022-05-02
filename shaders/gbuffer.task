@@ -42,12 +42,13 @@ out taskNV block
 
 bool InsideFrustum(vec4 sphere)
 {
-	return (dot(camera.frustrum_planes[0].xyz, sphere.xyz) - camera.frustrum_planes[0].w > -sphere.w)
-	    && (dot(camera.frustrum_planes[1].xyz, sphere.xyz) - camera.frustrum_planes[1].w > -sphere.w)
-		&& (dot(camera.frustrum_planes[2].xyz, sphere.xyz) - camera.frustrum_planes[2].w > -sphere.w)
-		&& (dot(camera.frustrum_planes[3].xyz, sphere.xyz) - camera.frustrum_planes[3].w > -sphere.w)
-		&& (dot(camera.frustrum_planes[4].xyz, sphere.xyz) - camera.frustrum_planes[4].w > -sphere.w)
-		&& (dot(camera.frustrum_planes[5].xyz, sphere.xyz) - camera.frustrum_planes[5].w > -sphere.w);
+	for (int i = 0; i < 6; i++)
+	{
+		if (dot(camera.frustrum_planes[i].xyz, sphere.xyz) - camera.frustrum_planes[i].w <= -sphere.w)
+			return false;
+	}
+
+	return true;
 }
 
 shared uint meshletCount;
@@ -58,7 +59,16 @@ void main()
 	uint mgi = gl_WorkGroupID.x;
 	uint mi = mgi * 32 + ti;
 
-	bool accept = InsideFrustum(meshlets[mi].sphere);
+	float scale_x = length(vec3(model.transform[0][0], model.transform[0][1], model.transform[0][2]));
+	float scale_y = length(vec3(model.transform[1][0], model.transform[1][1], model.transform[1][2]));
+	float scale_z = length(vec3(model.transform[2][0], model.transform[2][1], model.transform[2][2]));
+
+	float mean_scale = (scale_x + scale_y + scale_z) / 3.0f;
+
+	vec3 sphere_center = vec3(model.transform * vec4(meshlets[mi].sphere.xyz, 1.0));
+	float sphere_radius = meshlets[mi].sphere.w * mean_scale;
+
+	bool accept = InsideFrustum(vec4(sphere_center, sphere_radius));
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);

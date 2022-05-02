@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
+#include <float.h>
 
-#define FLOAT_MAX 3.402823E+38f
 #define cgltf_call(call) do { cgltf_result _result = (call); assert(_result == cgltf_result_success); } while(0)
 
 internal rhi_descriptor_heap* s_image_heap;
@@ -299,7 +299,7 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
         aabb bbox;
         memset(&bbox, 0, sizeof(aabb));
 
-        bbox.min = HMM_Vec3(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX);
+        bbox.min = HMM_Vec3(FLT_MAX, FLT_MAX, FLT_MAX);
         bbox.max = HMM_Vec3(FLT_MIN, FLT_MIN, FLT_MIN);
 
         for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
@@ -307,12 +307,20 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
             u32 a = vec.meshlets[i].indices[j];
             const vertex* va = &vertices[vec.meshlets[i].vertices[a]];
 
-            bbox.min = HMM_MinVec3(va->position, bbox.min);
-            bbox.max = HMM_MaxVec3(va->position, bbox.max);
+            bbox.min.X = min(bbox.min.X, va->position.X);
+            bbox.min.Y = min(bbox.min.Y, va->position.Y);
+            bbox.min.Z = min(bbox.min.Z, va->position.Z);
+
+            bbox.max.X = max(bbox.max.X, va->position.X);
+            bbox.max.Y = max(bbox.max.Y, va->position.Y);
+            bbox.max.Z = max(bbox.max.Z, va->position.Z);
         }
 
-        vec.meshlets[i].sphere.XYZ = HMM_DivideVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 2.0f);
-        
+        hmm_vec3 bbox_extent = HMM_MultiplyVec3f(HMM_SubtractVec3(bbox.max, bbox.min), 0.5f);
+        hmm_vec3 bbox_center = HMM_AddVec3(bbox.min, bbox_extent);
+
+        vec.meshlets[i].sphere.XYZ = bbox_center;
+
         for (u32 j = 0; j < vec.meshlets[i].vertex_count; ++j)
         {
             u32 a = vec.meshlets[i].indices[j];
