@@ -18,15 +18,18 @@ struct vertex
     hmm_vec3 normals;
 };
 
+#pragma pack(push, 16)
 typedef struct meshlet meshlet;
 struct meshlet
 {
     hmm_vec4 sphere;
+
     u32 vertices[MAX_MESHLET_VERTICES];
     u8 indices[MAX_MESHLET_INDICES];
     u8 vertex_count;
     u8 triangle_count;
 };
+#pragma pack(pop)
 
 typedef struct gltf_material gltf_material;
 struct gltf_material

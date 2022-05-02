@@ -17,6 +17,7 @@ typedef i32 b32;
 #define internal static
 
 #define OFFSET_PTR_BYTES(type, ptr, offset) ((type*)((u8*)ptr + (offset)))
+#define PAD_SIZE(size, dst) ((size - 1) | (dst - 1)) + 1
 
 #define KEY_SPACE 32
 #define KEY_COMMA 188

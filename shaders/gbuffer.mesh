@@ -22,6 +22,7 @@ layout (binding = 0, set = 4) readonly buffer Vertices
 struct Meshlet
 {
 	vec4 sphere;
+
 	uint vertices[64];   
     uint indices_packed[124*3/4];   
     uint8_t vertex_count;
@@ -36,8 +37,10 @@ layout (binding = 1, set = 4) readonly buffer Meshlets
 layout (binding = 0, set = 0) uniform SceneData {
 	mat4 projection;
 	mat4 view;
+
 	vec3 camera_position;
 	float padding0;
+
 	vec4 frustrum_planes[6];
 } scene;
 

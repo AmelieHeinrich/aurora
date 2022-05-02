@@ -12,6 +12,7 @@ const float pi_half = 1.57079;
 struct Meshlet
 {
 	vec4 sphere;
+
 	uint vertices[64];   
     uint indices_packed[124*3/4];   
     uint8_t vertex_count;
@@ -67,8 +68,9 @@ void main()
 
 	vec3 sphere_center = vec3(model.transform * vec4(meshlets[mi].sphere.xyz, 1.0));
 	float sphere_radius = meshlets[mi].sphere.w * mean_scale;
+	vec4 final_sphere = vec4(sphere_center, sphere_radius);
 
-	bool accept = InsideFrustum(vec4(sphere_center, sphere_radius));
+	bool accept = InsideFrustum(final_sphere);
 	uvec4 ballot = subgroupBallot(accept);
 
 	uint index = subgroupBallotExclusiveBitCount(ballot);
