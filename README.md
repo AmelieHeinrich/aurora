@@ -7,6 +7,20 @@
 - Vulkan Memory Allocator
 - volk
   
+## Features:
+
+- Vulkan Backend
+- GLTF loading using CGLTF
+- Bindless resource model for textures and sampelrs
+- PBR shading
+- Turing Mesh Shader pipeline
+- Frustum Culling
+- Fast Approximate Anti-Aliasing (FXAA)
+
+## Screenshots:
+
+![Sponza](.github/sponza.png)
+
 ## Running the engine:
 
 ```bat

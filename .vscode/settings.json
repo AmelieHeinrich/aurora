@@ -23,6 +23,9 @@
         "xlocnum": "c",
         "xstring": "c",
         "xtree": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "vma.h": "c",
+        "render_graph.h": "c",
+        "mesh.h": "c"
     }
 }
