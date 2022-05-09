@@ -26,9 +26,10 @@ void init_render_graph(RenderGraph* graph, RenderGraphExecute* execute)
     memset(&execute->light_info, 0, sizeof(execute->light_info));
     graph->node_count = 0;
 
-    rhi_init_descriptor_heap(&execute->image_heap, DESCRIPTOR_HEAP_IMAGE, 1024);
-	rhi_init_descriptor_heap(&execute->sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 16);
+    rhi_init_descriptor_heap(&execute->image_heap, DESCRIPTOR_HEAP_IMAGE, 512);
+	rhi_init_descriptor_heap(&execute->sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 512);
 	mesh_loader_set_texture_heap(&execute->image_heap);
+    mesh_loader_set_sampler_heap(&execute->sampler_heap);
 	mesh_loader_init(4);
 
     execute->camera_descriptor_set_layout.binding = 1;

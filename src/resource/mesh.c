@@ -11,6 +11,7 @@
 #define cgltf_call(call) do { cgltf_result _result = (call); assert(_result == cgltf_result_success); } while(0)
 
 internal RHI_DescriptorHeap* s_image_heap;
+internal RHI_DescriptorHeap* s_sampler_heap;
 internal RHI_DescriptorSetLayout s_descriptor_set_layout;
 internal RHI_DescriptorSetLayout s_meshlet_set_layout;
 
@@ -340,9 +341,11 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
         i32 albedo_idx;
         i32 normal_idx;
         i32 mr_idx;
+        i32 sampler_idx;
         hmm_vec3 bc_factor;
         f32 m_factor;
         f32 r_factor;
+        hmm_vec3 pad;
     } temp_mat;
 
     // Load textures
@@ -359,6 +362,13 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
                 rhi_load_image(&m->materials[pri->material_index].albedo, tx_path);
                 m->materials[pri->material_index].albedo_bindless_index = rhi_find_available_descriptor(s_image_heap);
                 rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].albedo, m->materials[pri->material_index].albedo_bindless_index);
+
+                m->materials[pri->material_index].albedo_sampler.filter = VK_FILTER_LINEAR;
+                m->materials[pri->material_index].albedo_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+                rhi_init_sampler(&m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo.mip_levels);
+                m->materials[pri->material_index].albedo_sampler_index = rhi_find_available_descriptor(s_sampler_heap);
+                rhi_push_descriptor_heap_sampler(s_sampler_heap, &m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo_sampler_index);
             
                 m->materials[pri->material_index].base_color_factor.X = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[0];
                 m->materials[pri->material_index].base_color_factor.Y = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[1];
@@ -396,6 +406,7 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
         
             temp_mat temp;
             temp.albedo_idx = m->materials[pri->material_index].albedo_bindless_index;
+            temp.sampler_idx = m->materials[pri->material_index].albedo_sampler_index;
             temp.normal_idx = m->materials[pri->material_index].normal_bindless_index;
             temp.mr_idx = m->materials[pri->material_index].metallic_roughness_index;
             temp.bc_factor = m->materials[pri->material_index].base_color_factor;
@@ -480,7 +491,10 @@ void mesh_free(Mesh* m)
     for (i32 i = 0; i < m->material_count; i++)
     {
         if (m->materials[i].albedo.image != VK_NULL_HANDLE)
+        {
             rhi_free_image(&m->materials[i].albedo);
+            rhi_free_sampler(&m->materials[i].albedo_sampler);
+        }
         if (m->materials[i].normal.image != VK_NULL_HANDLE)
             rhi_free_image(&m->materials[i].normal);
         if (m->materials[i].metallic_roughness.image != VK_NULL_HANDLE)
@@ -488,4 +502,9 @@ void mesh_free(Mesh* m)
         rhi_free_buffer(&m->materials[i].material_buffer);
         rhi_free_descriptor_set(&m->materials[i].material_set);
     }
+}
+
+void mesh_loader_set_sampler_heap(RHI_DescriptorHeap* heap)
+{
+    s_sampler_heap = heap;
 }

@@ -37,8 +37,12 @@ struct GLTFMaterial
 {
     RHI_Image albedo;
     i32 albedo_bindless_index;
+    RHI_Sampler albedo_sampler;
+    i32 albedo_sampler_index;
+
     RHI_Image normal;
     i32 normal_bindless_index;
+
     RHI_Image metallic_roughness;
     i32 metallic_roughness_index;
 
@@ -90,6 +94,7 @@ void mesh_loader_free();
 RHI_DescriptorSetLayout* mesh_loader_get_descriptor_set_layout();
 RHI_DescriptorSetLayout* mesh_loader_get_geometry_descriptor_set_layout();
 void mesh_loader_set_texture_heap(RHI_DescriptorHeap* heap);
+void mesh_loader_set_sampler_heap(RHI_DescriptorHeap* heap);
 void mesh_load(Mesh* out, const char* path);
 void mesh_free(Mesh* m);
 

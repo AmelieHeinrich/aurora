@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <math.h>
 
 #define vk_check(result) assert(result == VK_SUCCESS)
 #define ARRAY_SIZE(array) sizeof(array) / sizeof(array[0])
@@ -411,6 +412,7 @@ void rhi_make_swapchain()
         state.rhi_swap_chain[i].image = state.swap_chain_images[i];
         state.rhi_swap_chain[i].image_view = state.swap_chain_image_views[i];
         state.rhi_swap_chain[i].image_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        state.rhi_swap_chain[i].mip_levels = 1;
     }
 }
 
@@ -802,7 +804,7 @@ void rhi_descriptor_set_write_image(RHI_DescriptorSet* set, RHI_Image* image, i3
     vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
 }
 
-void rhi_init_sampler(RHI_Sampler* sampler)
+void rhi_init_sampler(RHI_Sampler* sampler, u32 mips)
 {
     VkSamplerCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -811,12 +813,16 @@ void rhi_init_sampler(RHI_Sampler* sampler)
     create_info.addressModeU = sampler->address_mode;
     create_info.addressModeV = create_info.addressModeU;
     create_info.addressModeW = create_info.addressModeU;
-    create_info.anisotropyEnable = 1;
+    create_info.anisotropyEnable = VK_TRUE;
     create_info.maxAnisotropy = state.physical_device_properties_2.properties.limits.maxSamplerAnisotropy;
     create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    create_info.compareEnable = 0;
-    create_info.compareOp = VK_COMPARE_OP_NEVER;
+    create_info.compareEnable = VK_FALSE;
+    create_info.compareOp = VK_COMPARE_OP_ALWAYS;
     create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    create_info.unnormalizedCoordinates = VK_FALSE;
+    create_info.minLod = 0.0f;
+    create_info.maxLod = (f32)(mips);
+    create_info.mipLodBias = 0.0f;
 
     VkResult res = vkCreateSampler(state.device, &create_info, NULL, &sampler->sampler);
     vk_check(res);
@@ -1160,6 +1166,7 @@ void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format
     image->usage = usage;
     image->extent.width = width;
     image->extent.height = height;
+    image->mip_levels = 1;
 
     VkImageCreateInfo image_create_info = { 0 };
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1168,7 +1175,7 @@ void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format
     image_create_info.extent.height = height;
     image_create_info.format = format;
     image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
+    image_create_info.mipLevels = image->mip_levels;
     image_create_info.arrayLayers = 1;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1189,7 +1196,7 @@ void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format
     view_info.format = image->format;
     view_info.subresourceRange.aspectMask = vk_get_image_aspect(image->format);
     view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.levelCount = image->mip_levels;
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
     view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1252,6 +1259,84 @@ void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat form
     vk_check(res);
 }
 
+void rhi_generate_mipmaps(RHI_Image* image)
+{
+    RHI_CommandBuffer cmd_buf;
+    rhi_init_cmd_buf(&cmd_buf, COMMAND_BUFFER_GRAPHICS);
+
+    rhi_begin_cmd_buf(&cmd_buf);
+
+    VkImageMemoryBarrier barrier;
+    memset(&barrier, 0, sizeof(barrier));
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.image = image->image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.levelCount = 1;
+
+    i32 mip_width = image->width;
+    i32 mip_height = image->height;
+
+    for (u32 i = 1; i < image->mip_levels; i++)
+    {
+        barrier.subresourceRange.baseMipLevel = i - 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmd_buf.buf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+        VkImageBlit blit;
+        memset(&blit, 0, sizeof(blit));
+        blit.srcOffsets[0].x = 0;
+        blit.srcOffsets[0].y = 0;
+        blit.srcOffsets[0].z = 0;
+        blit.srcOffsets[1].x = mip_width;
+        blit.srcOffsets[1].y = mip_height;
+        blit.srcOffsets[1].z = 1;
+        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.srcSubresource.mipLevel = i - 1;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = 1;
+        blit.dstOffsets[0].x = 0;
+        blit.dstOffsets[0].y = 0;
+        blit.dstOffsets[0].z = 0;
+        blit.dstOffsets[1].x = mip_width > 1 ? mip_width / 2 : 1;
+        blit.dstOffsets[1].y = mip_height > 1 ? mip_height / 2 : 1;
+        blit.dstOffsets[1].z = 1;
+        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.dstSubresource.mipLevel = i;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = 1;
+
+        vkCmdBlitImage(cmd_buf.buf, image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmd_buf.buf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+        if (mip_width > 1) mip_width /= 2;
+        if (mip_height > 1) mip_height /= 2;
+    }
+
+    barrier.subresourceRange.baseMipLevel = image->mip_levels - 1;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(cmd_buf.buf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+    rhi_submit_cmd_buf(&cmd_buf);
+}
+
 void rhi_load_image(RHI_Image* image, const char* path)
 {
     i32 width, height, channels = 0;
@@ -1259,13 +1344,14 @@ void rhi_load_image(RHI_Image* image, const char* path)
     assert(data);
     i64 image_size = width * height * 4;
 
-    image->format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+    image->format = VK_FORMAT_R8G8B8A8_UNORM;
     image->extent.width = width;
     image->extent.height = height;
     image->width = width;
     image->height = height;
     image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     image->image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image->mip_levels = (u32)(floor(log2(max(width, height))) + 1);
     
     VkImageCreateInfo image_create_info = { 0 };
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1274,11 +1360,11 @@ void rhi_load_image(RHI_Image* image, const char* path)
     image_create_info.extent.height = height;
     image_create_info.format = image->format;
     image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
+    image_create_info.mipLevels = image->mip_levels;
     image_create_info.arrayLayers = 1;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1322,7 +1408,6 @@ void rhi_load_image(RHI_Image* image, const char* path)
     rhi_begin_cmd_buf(&temp);
     rhi_cmd_img_transition_layout(&temp, image, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
     vkCmdCopyBufferToImage(temp.buf, staging_buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy_region);
-    rhi_cmd_img_transition_layout(&temp, image, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
     rhi_end_cmd_buf(&temp);
     rhi_submit_upload_cmd_buf(&temp);
 
@@ -1336,7 +1421,7 @@ void rhi_load_image(RHI_Image* image, const char* path)
     view_info.format = image->format;
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.levelCount = image->mip_levels;
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
     view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1346,6 +1431,8 @@ void rhi_load_image(RHI_Image* image, const char* path)
 
     res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
     assert(res == VK_SUCCESS);
+
+    rhi_generate_mipmaps(image);
 }
 
 void rhi_load_hdr_image(RHI_Image* image, const char* path)
@@ -1775,7 +1862,7 @@ void rhi_cmd_img_transition_layout(RHI_CommandBuffer* buf, RHI_Image* img, u32 s
 {
     VkImageSubresourceRange range = { 0 };
     range.baseMipLevel = 0;
-    range.levelCount = VK_REMAINING_MIP_LEVELS;
+    range.levelCount = img->mip_levels == 1 ? VK_REMAINING_MIP_LEVELS : img->mip_levels;
     range.baseArrayLayer = layer;
     range.layerCount = VK_REMAINING_ARRAY_LAYERS;
     range.aspectMask = (VkImageAspectFlagBits)vk_get_image_aspect(img->format);

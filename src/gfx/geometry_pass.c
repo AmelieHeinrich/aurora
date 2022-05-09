@@ -54,12 +54,12 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
     data->nearest_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	data->nearest_sampler.filter = VK_FILTER_NEAREST;
-	rhi_init_sampler(&data->nearest_sampler);
+	rhi_init_sampler(&data->nearest_sampler, 1);
 	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->nearest_sampler, 0);
 
     data->linear_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	data->linear_sampler.filter = VK_FILTER_LINEAR;
-	rhi_init_sampler(&data->linear_sampler);
+	rhi_init_sampler(&data->linear_sampler, 1);
 	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->linear_sampler, 1);
 
     rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);

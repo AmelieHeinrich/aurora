@@ -46,6 +46,7 @@ struct RHI_Image
 
     i32 width, height;
     u32 usage;
+    u32 mip_levels;
 };
 
 typedef struct RHI_Sampler RHI_Sampler;
@@ -185,7 +186,7 @@ void rhi_descriptor_set_write_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer,
 void rhi_descriptor_set_write_storage_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding);
 
 // Samplers
-void rhi_init_sampler(RHI_Sampler* sampler);
+void rhi_init_sampler(RHI_Sampler* sampler, u32 mips);
 void rhi_free_sampler(RHI_Sampler* sampler);
 
 // Pipeline/Shaders

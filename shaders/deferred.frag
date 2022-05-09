@@ -19,7 +19,7 @@ layout (binding = 0, set = 0) uniform texture2D gPosition;
 layout (binding = 1, set = 0) uniform texture2D gNormal;
 layout (binding = 2, set = 0) uniform texture2D gAlbedo;
 layout (binding = 3, set = 0) uniform texture2D gMetallicRoughness;
-layout (binding = 0, set = 1) uniform sampler   SamplerHeap[16];
+layout (binding = 0, set = 1) uniform sampler   SamplerHeap[512];
 
 layout (binding = 0, set = 2) uniform Lights {
     PointLight lights[MAX_LIGHTS];
@@ -90,16 +90,14 @@ void main()
     vec4 Diffuse = texture(sampler2D(gAlbedo, SamplerHeap[0]), fTexcoords.xy);
     vec4 MR = texture(sampler2D(gMetallicRoughness, SamplerHeap[0]), fTexcoords.xy);
 
-    float metallic = MR.g;
-    float roughness = MR.b;
+    float metallic = MR.b;
+    float roughness = MR.g;
 
     if (metallic == 0.0)
         metallic = 0.1;
     if (roughness == 0.0)
         roughness = 0.5;
 
-    if (Diffuse.a < 0.25)
-        discard;
     Diffuse.rgb = pow(Diffuse.rgb, vec3(2.2));
 
     float ao = 1.0f;

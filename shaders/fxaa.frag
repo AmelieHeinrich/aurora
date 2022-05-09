@@ -63,15 +63,9 @@ vec3 apply_fxaa(vec4 uv, texture2D tex, sampler samp, vec2 rcpFrame)
     return rgbB;
 }
 
-void main()
+vec3 aces(vec3 color, float gamma) 
 {
-    vec2 rcpFrame = 1.0 / settings.screen_size;
-  	vec2 uv2 = OutUV;
-
-    vec4 uv = vec4( uv2, uv2 - (rcpFrame * (0.5 + FXAA_THRESHOLD)));
-	vec3 col = apply_fxaa(uv, color_image, SamplerHeap[1], 1.0 / settings.screen_size.xy);
-    
-    const mat3 inputMatrix = mat3
+	const mat3 inputMatrix = mat3
     (
 		vec3(0.59719, 0.07600, 0.02840),
 		vec3(0.35458, 0.90834, 0.13383),
@@ -85,11 +79,80 @@ void main()
 		vec3(-0.07367, -0.00605, 1.07602)
     );
     
-    vec3 inputColour = inputMatrix * col;
+    vec3 inputColour = inputMatrix * color;
     vec3 a = inputColour * (inputColour + vec3(0.0245786)) - vec3(0.000090537);
     vec3 b = inputColour * (0.983729 * inputColour + 0.4329510) + 0.238081;
     vec3 c = a / b;
-    col = pow(max(outputMatrix * c, 0.0.xxx), vec3(1. / 2.2));
+    return pow(max(outputMatrix * c, 0.0.xxx), vec3(1. / gamma));
+}
+
+vec3 filmic(vec3 color, float gamma) 
+{
+	color = max(vec3(0.), color - vec3(0.004));
+	color = (color * (6.2 * color + .5)) / (color * (6.2 * color + 1.7) + 0.06);
+	return pow(color, vec3(1. / gamma));
+}
+
+vec3 reinhard(vec3 color, float gamma)
+{
+	float exposure = 1.5;
+	color *= exposure/(1. + color / exposure);
+	color = pow(color, vec3(1.0 / gamma));
+	return color;
+}
+
+vec3 lumaReinhard(vec3 color, float gamma) 
+{
+	float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+	float toneMappedLuma = luma / (1. + luma);
+	color *= toneMappedLuma / luma;
+	color = pow(color, vec3(1. / gamma));
+	return color;
+}
+
+vec3 whitePreservingLumaReinhard(vec3 color, float gamma)
+{
+	float white = 2.;
+	float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+	float toneMappedLuma = luma * (1. + luma / (white*white)) / (1. + luma);
+	color *= toneMappedLuma / luma;
+	color = pow(color, vec3(1. / gamma));
+	return color;
+}
+
+vec3 romBinDaHouse(vec3 color, float gamma)
+{
+	color = exp( -1.0 / ( 2.72*color + 0.15 ) );
+	color = pow(color, vec3(1. / gamma));
+	return color;
+}
+
+vec3 uncharted2(vec3 color, float gamma) {
+	float A = 0.15;
+	float B = 0.50;
+	float C = 0.10;
+	float D = 0.20;
+	float E = 0.02;
+	float F = 0.30;
+	float W = 11.2;
+	float exposure = 2.0;
+	color *= exposure;
+	color = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+	float white = ((W * (A * W + C * B) + D * E) / (W * (A * W + B) + D * F)) - E / F;
+	color /= white;
+	color = pow(color, vec3(1.0 / gamma));
+	return color;
+}
+
+void main()
+{
+    vec2 rcpFrame = 1.0 / settings.screen_size;
+  	vec2 uv2 = OutUV;
+
+    vec4 uv = vec4( uv2, uv2 - (rcpFrame * (0.5 + FXAA_THRESHOLD)));
+	vec3 col = apply_fxaa(uv, color_image, SamplerHeap[0], 1.0 / settings.screen_size.xy);
+
+    col = aces(col, 2.2);
 
     OutColor = vec4(col, 1.0);
 }
