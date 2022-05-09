@@ -20,12 +20,13 @@ TODO: Global Illumination
 #define IMAGE_RTV VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 #define IMAGE_GBUFFER VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 #define IMAGE_DSV VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
-#define IMAGE_STORAGE VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_SAMPLED_BIT
+#define IMAGE_STORAGE VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 #define DESCRIPTOR_HEAP_IMAGE 0
 #define DESCRIPTOR_HEAP_SAMPLER 1
 #define DESCRIPTOR_IMAGE VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 #define DESCRIPTOR_SAMPLER VK_DESCRIPTOR_TYPE_SAMPLER
 #define DESCRIPTOR_BUFFER VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+#define DESCRIPTOR_STORAGE_IMAGE VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
 
 // It's not like I'm going to implement another graphics API for this project, so we'll let the vulkan stuff public for now kekw
 #include <vulkan/vulkan.h>
@@ -183,6 +184,7 @@ void rhi_init_descriptor_set(RHI_DescriptorSet* set, RHI_DescriptorSetLayout* la
 void rhi_free_descriptor_set(RHI_DescriptorSet* set);
 void rhi_descriptor_set_write_image(RHI_DescriptorSet* set, RHI_Image* image, i32 binding);
 void rhi_descriptor_set_write_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding);
+void rhi_descriptor_set_write_storage_image(RHI_DescriptorSet* set, RHI_Image* image, RHI_Sampler* sampler, i32 binding);
 void rhi_descriptor_set_write_storage_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding);
 
 // Samplers
@@ -219,6 +221,7 @@ void rhi_free_descriptor_heap(RHI_DescriptorHeap* heap);
 
 // Cmd Buf
 void rhi_init_cmd_buf(RHI_CommandBuffer* buf, u32 command_buffer_type);
+void rhi_free_cmd_buf(RHI_CommandBuffer* buf);
 void rhi_init_upload_cmd_buf(RHI_CommandBuffer* buf);
 void rhi_submit_cmd_buf(RHI_CommandBuffer* buf);
 void rhi_submit_upload_cmd_buf(RHI_CommandBuffer* buf);

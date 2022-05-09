@@ -15,9 +15,14 @@ struct geometry_pass
 
     RHI_Sampler nearest_sampler;
     RHI_Sampler linear_sampler;
+    RHI_Sampler cubemap_sampler;
 
+    RHI_Pipeline cubemap_pipeline;
     RHI_Pipeline gbuffer_pipeline;
     RHI_Pipeline deferred_pipeline;
+
+    RHI_Image hdr_cubemap;
+    RHI_Image cubemap;
 
     RHI_Image gPosition;
     RHI_Image gNormal;
@@ -26,6 +31,9 @@ struct geometry_pass
 
     RHI_Buffer screen_vertex_buffer;
     RHI_Buffer render_params_buffer;
+
+    RHI_DescriptorSetLayout cubemap_set_layout;
+    RHI_DescriptorSet cubemap_set;
 
     RHI_DescriptorSetLayout params_set_layout;
     RHI_DescriptorSet params_set;
@@ -62,6 +70,13 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 	rhi_init_sampler(&data->linear_sampler, 1);
 	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->linear_sampler, 1);
 
+    data->cubemap_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    data->cubemap_sampler.filter = VK_FILTER_LINEAR;
+    rhi_init_sampler(&data->cubemap_sampler, 1);
+
+    rhi_load_hdr_image(&data->hdr_cubemap, "assets/env_map.hdr");
+    rhi_allocate_cubemap(&data->cubemap, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
+
     rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
     rhi_allocate_image(&data->gNormal, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
     rhi_allocate_image(&data->gAlbedo, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER);
@@ -69,6 +84,53 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_RTV);
     rhi_allocate_image(&node->outputs[1], execute->width, execute->height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     node->output_count = 2;
+
+    RHI_CommandBuffer cmd_buf;
+    rhi_init_cmd_buf(&cmd_buf, COMMAND_BUFFER_COMPUTE);
+    rhi_begin_cmd_buf(&cmd_buf);
+
+    {
+        data->cubemap_set_layout.binding = 0;
+        data->cubemap_set_layout.descriptors[0] = DESCRIPTOR_STORAGE_IMAGE;
+        data->cubemap_set_layout.descriptors[1] = DESCRIPTOR_STORAGE_IMAGE;
+        data->cubemap_set_layout.descriptor_count = 2;
+        rhi_init_descriptor_set_layout(&data->cubemap_set_layout);
+
+        rhi_init_descriptor_set(&data->cubemap_set, &data->cubemap_set_layout);
+
+        {
+            RHI_ShaderModule cs;
+
+            rhi_load_shader(&cs, "shaders/equirectangular_cubemap.comp.spv");
+
+            RHI_PipelineDescriptor descriptor;
+            descriptor.use_mesh_shaders = 0;
+            descriptor.push_constant_size = 0;
+            descriptor.set_layouts[0] = &data->cubemap_set_layout;
+            descriptor.set_layout_count = 1;
+            descriptor.shaders.cs = &cs;
+            descriptor.depth_biased_enable = 0;
+
+            rhi_init_compute_pipeline(&data->cubemap_pipeline, &descriptor);
+
+            rhi_free_shader(&cs);
+        }
+
+        // equi to cubemap compute
+
+        rhi_cmd_img_transition_layout(&cmd_buf, &data->hdr_cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+        rhi_cmd_img_transition_layout(&cmd_buf, &data->cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+
+        rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->hdr_cubemap, &data->nearest_sampler, 0);
+        rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->cubemap, &data->cubemap_sampler, 1);
+
+        rhi_cmd_set_pipeline(&cmd_buf, &data->cubemap_pipeline);
+        rhi_cmd_set_descriptor_set(&cmd_buf, &data->cubemap_pipeline, &data->cubemap_set, 0);
+        rhi_cmd_dispatch(&cmd_buf, 1024 / 32, 1024 / 32, 6);
+
+        rhi_submit_cmd_buf(&cmd_buf);
+        rhi_free_cmd_buf(&cmd_buf);
+    }
 
     {
         data->deferred_set_layout.binding = 0;
@@ -299,6 +361,12 @@ void geometry_pass_free(RenderGraphNode* node, RenderGraphExecute* execute)
 {
     geometry_pass* data = node->private_data;
 
+    rhi_free_descriptor_set(&data->cubemap_set);
+    rhi_free_descriptor_set_layout(&data->cubemap_set_layout);
+    rhi_free_pipeline(&data->cubemap_pipeline);
+    rhi_free_image(&data->cubemap);
+    rhi_free_image(&data->hdr_cubemap);
+
     rhi_free_image(&data->gPosition);
     rhi_free_image(&data->gNormal);
     rhi_free_image(&data->gAlbedo);
@@ -307,6 +375,7 @@ void geometry_pass_free(RenderGraphNode* node, RenderGraphExecute* execute)
     rhi_free_image(&node->outputs[0]);
     rhi_free_pipeline(&data->deferred_pipeline);
     rhi_free_pipeline(&data->gbuffer_pipeline);
+    rhi_free_sampler(&data->cubemap_sampler);
     rhi_free_sampler(&data->linear_sampler);
     rhi_free_sampler(&data->nearest_sampler);
     rhi_free_descriptor_set(&data->params_set);

@@ -766,6 +766,25 @@ void rhi_descriptor_set_write_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer,
     vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
 }
 
+void rhi_descriptor_set_write_storage_image(RHI_DescriptorSet* set, RHI_Image* image, RHI_Sampler* sampler, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_info.imageView = image->image_view;
+    image_info.sampler = sampler->sampler;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pImageInfo = &image_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
 void rhi_descriptor_set_write_storage_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding)
 {
     VkDescriptorBufferInfo buffer_info = {0};
@@ -1217,6 +1236,7 @@ void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat form
     image->usage = usage;
     image->extent.width = width;
     image->extent.height = height;
+    image->mip_levels = 1;
 
     VkImageCreateInfo image_create_info = { 0 };
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1440,7 +1460,7 @@ void rhi_load_hdr_image(RHI_Image* image, const char* path)
     i32 width, height, channels = 0;
     u16* data = stbi_load_16(path, &width, &height, &channels, STBI_rgb_alpha);
     assert(data);
-    i64 image_size = width * height * 16;
+    i64 image_size = width * height * 4 * sizeof(u16);
 
     image->format = VK_FORMAT_R16G16B16A16_UNORM;
     image->extent.width = width;
@@ -1449,6 +1469,7 @@ void rhi_load_hdr_image(RHI_Image* image, const char* path)
     image->height = height;
     image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     image->image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image->mip_levels = 1;
     
     VkImageCreateInfo image_create_info = { 0 };
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1644,6 +1665,11 @@ void rhi_init_cmd_buf(RHI_CommandBuffer* buf, u32 command_buffer_type)
 
     VkResult result = vkAllocateCommandBuffers(state.device, &alloc_info, &buf->buf);
     vk_check(result);
+}
+
+void rhi_free_cmd_buf(RHI_CommandBuffer* buf)
+{
+    vkFreeCommandBuffers(state.device, buf->command_buffer_type == COMMAND_BUFFER_GRAPHICS ? state.graphics_pool : state.compute_pool, 1, &buf->buf);
 }
 
 void rhi_init_upload_cmd_buf(RHI_CommandBuffer* buf)
