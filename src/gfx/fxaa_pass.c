@@ -42,6 +42,7 @@ void fxaa_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         rhi_load_shader(&ps, "shaders/fxaa.frag.spv");
 
         RHI_PipelineDescriptor descriptor;
+        descriptor.reflect_input_layout = 1;
         descriptor.shaders.vs = &vs;
         descriptor.shaders.ps = &ps;
         descriptor.push_constant_size = sizeof(hmm_vec4);

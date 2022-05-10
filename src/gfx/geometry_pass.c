@@ -18,11 +18,18 @@ struct geometry_pass
     RHI_Sampler cubemap_sampler;
 
     RHI_Pipeline cubemap_pipeline;
+    RHI_Pipeline skybox_pipeline;
+    RHI_Pipeline irradiance_pipeline;
+    RHI_Pipeline prefilter_pipeline;
+    RHI_Pipeline brdf_pipeline;
     RHI_Pipeline gbuffer_pipeline;
     RHI_Pipeline deferred_pipeline;
 
     RHI_Image hdr_cubemap;
     RHI_Image cubemap;
+    RHI_Image irradiance;
+    RHI_Image prefilter;
+    RHI_Image brdf;
 
     RHI_Image gPosition;
     RHI_Image gNormal;
@@ -35,11 +42,23 @@ struct geometry_pass
     RHI_DescriptorSetLayout cubemap_set_layout;
     RHI_DescriptorSet cubemap_set;
 
+    RHI_DescriptorSetLayout irradiance_set_layout;
+    RHI_DescriptorSet irradiance_set;
+
+    RHI_DescriptorSetLayout prefilter_set_layout;
+    RHI_DescriptorSet prefilter_set;
+
     RHI_DescriptorSetLayout params_set_layout;
     RHI_DescriptorSet params_set;
 
     RHI_DescriptorSetLayout deferred_set_layout;
     RHI_DescriptorSet deferred_set;
+
+    RHI_DescriptorSetLayout skybox_set_layout;
+    RHI_DescriptorSet skybox_set;
+
+    RHI_DescriptorSetLayout brdf_set_layout;
+    RHI_DescriptorSet brdf_set;
 };
 
 void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
@@ -76,6 +95,9 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
     rhi_load_hdr_image(&data->hdr_cubemap, "assets/env_map.hdr");
     rhi_allocate_cubemap(&data->cubemap, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
+    rhi_allocate_cubemap(&data->irradiance, 128, 128, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
+    rhi_allocate_cubemap(&data->prefilter, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
+    rhi_allocate_image(&data->brdf, 512, 512, VK_FORMAT_R16G16_SFLOAT, IMAGE_STORAGE);
 
     rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
     rhi_allocate_image(&data->gNormal, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
@@ -87,18 +109,17 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
     RHI_CommandBuffer cmd_buf;
     rhi_init_cmd_buf(&cmd_buf, COMMAND_BUFFER_COMPUTE);
-    rhi_begin_cmd_buf(&cmd_buf);
 
     {
-        data->cubemap_set_layout.binding = 0;
-        data->cubemap_set_layout.descriptors[0] = DESCRIPTOR_STORAGE_IMAGE;
-        data->cubemap_set_layout.descriptors[1] = DESCRIPTOR_STORAGE_IMAGE;
-        data->cubemap_set_layout.descriptor_count = 2;
-        rhi_init_descriptor_set_layout(&data->cubemap_set_layout);
-
-        rhi_init_descriptor_set(&data->cubemap_set, &data->cubemap_set_layout);
-
         {
+            data->cubemap_set_layout.binding = 0;
+            data->cubemap_set_layout.descriptors[0] = DESCRIPTOR_STORAGE_IMAGE;
+            data->cubemap_set_layout.descriptors[1] = DESCRIPTOR_STORAGE_IMAGE;
+            data->cubemap_set_layout.descriptor_count = 2;
+            rhi_init_descriptor_set_layout(&data->cubemap_set_layout);
+
+            rhi_init_descriptor_set(&data->cubemap_set, &data->cubemap_set_layout);
+
             RHI_ShaderModule cs;
 
             rhi_load_shader(&cs, "shaders/equirectangular_cubemap.comp.spv");
@@ -116,20 +137,199 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
             rhi_free_shader(&cs);
         }
 
+        {
+            data->irradiance_set_layout.binding = 0;
+            data->irradiance_set_layout.descriptors[0] = DESCRIPTOR_SAMPLED_IMAGE;
+            data->irradiance_set_layout.descriptors[1] = DESCRIPTOR_STORAGE_IMAGE;
+            data->irradiance_set_layout.descriptor_count = 2;
+            rhi_init_descriptor_set_layout(&data->irradiance_set_layout);
+
+            rhi_init_descriptor_set(&data->irradiance_set, &data->irradiance_set_layout);
+
+            RHI_ShaderModule cs;
+
+            rhi_load_shader(&cs, "shaders/irradiance.comp.spv");
+
+            RHI_PipelineDescriptor descriptor;
+            descriptor.push_constant_size = 0;
+            descriptor.set_layouts[0] = &data->irradiance_set_layout;
+            descriptor.set_layout_count = 1;
+            descriptor.shaders.cs = &cs;
+
+            rhi_init_compute_pipeline(&data->irradiance_pipeline, &descriptor);
+
+            rhi_free_shader(&cs);
+        }
+
+        {
+            data->prefilter_set_layout.binding = 0;
+            data->prefilter_set_layout.descriptors[0] = DESCRIPTOR_SAMPLED_IMAGE;
+            data->prefilter_set_layout.descriptors[1] = DESCRIPTOR_STORAGE_IMAGE;
+            data->prefilter_set_layout.descriptor_count = 2;
+            rhi_init_descriptor_set_layout(&data->prefilter_set_layout);
+
+            rhi_init_descriptor_set(&data->prefilter_set, &data->prefilter_set_layout);
+
+            RHI_ShaderModule cs;
+
+            rhi_load_shader(&cs, "shaders/prefilter.comp.spv");
+
+            RHI_PipelineDescriptor descriptor;
+            descriptor.push_constant_size = sizeof(hmm_vec4);
+            descriptor.set_layouts[0] = &data->prefilter_set_layout;
+            descriptor.set_layout_count = 1;
+            descriptor.shaders.cs = &cs;
+
+            rhi_init_compute_pipeline(&data->prefilter_pipeline, &descriptor);
+
+            rhi_free_shader(&cs);
+        }
+
+        {
+            data->brdf_set_layout.binding = 0;
+            data->brdf_set_layout.descriptors[0] = DESCRIPTOR_STORAGE_IMAGE;
+            data->brdf_set_layout.descriptor_count = 1;
+            rhi_init_descriptor_set_layout(&data->brdf_set_layout);
+
+            rhi_init_descriptor_set(&data->brdf_set, &data->brdf_set_layout);
+
+            RHI_ShaderModule cs;
+
+            rhi_load_shader(&cs, "shaders/brdf.comp.spv");
+
+            RHI_PipelineDescriptor descriptor;
+            descriptor.push_constant_size = 0;
+            descriptor.set_layouts[0] = &data->brdf_set_layout;
+            descriptor.set_layout_count = 1;
+            descriptor.shaders.cs = &cs;
+
+            rhi_init_compute_pipeline(&data->brdf_pipeline, &descriptor);
+
+            rhi_free_shader(&cs);
+        }
+
         // equi to cubemap compute
+        {
+            rhi_begin_cmd_buf(&cmd_buf);
 
-        rhi_cmd_img_transition_layout(&cmd_buf, &data->hdr_cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
-        rhi_cmd_img_transition_layout(&cmd_buf, &data->cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->hdr_cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
 
-        rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->hdr_cubemap, &data->nearest_sampler, 0);
-        rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->cubemap, &data->cubemap_sampler, 1);
+            rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->hdr_cubemap, &data->nearest_sampler, 0);
+            rhi_descriptor_set_write_storage_image(&data->cubemap_set, &data->cubemap, &data->cubemap_sampler, 1);
 
-        rhi_cmd_set_pipeline(&cmd_buf, &data->cubemap_pipeline);
-        rhi_cmd_set_descriptor_set(&cmd_buf, &data->cubemap_pipeline, &data->cubemap_set, 0);
-        rhi_cmd_dispatch(&cmd_buf, 1024 / 32, 1024 / 32, 6);
+            rhi_cmd_set_pipeline(&cmd_buf, &data->cubemap_pipeline);
+            rhi_cmd_set_descriptor_set(&cmd_buf, &data->cubemap_pipeline, &data->cubemap_set, 0);
+            rhi_cmd_dispatch(&cmd_buf, 1024 / 32, 1024 / 32, 6);
 
-        rhi_submit_cmd_buf(&cmd_buf);
+            rhi_submit_cmd_buf(&cmd_buf);
+        }
+
+        // irradiance
+        {
+            rhi_begin_cmd_buf(&cmd_buf);
+
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->cubemap, 0, 0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->irradiance, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+
+            rhi_descriptor_set_write_image_sampler(&data->irradiance_set, &data->cubemap, &data->cubemap_sampler, 0);
+            rhi_descriptor_set_write_storage_image(&data->irradiance_set, &data->irradiance, &data->cubemap_sampler, 1);
+
+            rhi_cmd_set_pipeline(&cmd_buf, &data->irradiance_pipeline);
+            rhi_cmd_set_descriptor_set(&cmd_buf, &data->irradiance_pipeline, &data->irradiance_set, 0);
+            rhi_cmd_dispatch(&cmd_buf, 128 / 32, 128 / 32, 6);
+
+            rhi_submit_cmd_buf(&cmd_buf);
+        }
+
+        // prefilter
+        {
+            rhi_begin_cmd_buf(&cmd_buf);
+
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->prefilter, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+
+            rhi_descriptor_set_write_image_sampler(&data->prefilter_set, &data->cubemap, &data->cubemap_sampler, 0);
+            rhi_descriptor_set_write_storage_image(&data->prefilter_set, &data->prefilter, &data->cubemap_sampler, 1);
+
+            rhi_cmd_set_pipeline(&cmd_buf, &data->prefilter_pipeline);
+            rhi_cmd_set_descriptor_set(&cmd_buf, &data->prefilter_pipeline, &data->prefilter_set, 0);
+
+            for (u32 i = 0; i < 5; i++)
+	        {
+	        	u32 mip_width = (u32)(512.0f * pow(0.5f, i));
+	        	u32 mip_height = (u32)(512.0f * pow(0.5f, i));
+	        	f32 roughness = (f32)i / (f32)(5 - 1);
+
+	        	hmm_vec4 vec;
+                vec.X = roughness;
+
+	        	rhi_cmd_set_push_constants(&cmd_buf, &data->prefilter_pipeline, &vec, sizeof(hmm_vec4));
+	        	rhi_cmd_dispatch(&cmd_buf, mip_width / 32, mip_height / 32, 6);
+	        }
+
+            rhi_submit_cmd_buf(&cmd_buf);
+        }
+
+        // brdf
+        {
+            rhi_begin_cmd_buf(&cmd_buf);
+
+            rhi_cmd_img_transition_layout(&cmd_buf, &data->brdf, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
+
+            rhi_descriptor_set_write_storage_image(&data->brdf_set, &data->brdf, &data->nearest_sampler, 0);
+
+            rhi_cmd_set_pipeline(&cmd_buf, &data->brdf_pipeline);
+            rhi_cmd_set_descriptor_set(&cmd_buf, &data->brdf_pipeline, &data->brdf_set, 0);
+            rhi_cmd_dispatch(&cmd_buf, 512 / 32, 512 / 32, 6);
+
+            rhi_submit_cmd_buf(&cmd_buf);
+        }
+
         rhi_free_cmd_buf(&cmd_buf);
+
+        rhi_free_image(&data->hdr_cubemap);
+    }
+
+    {
+        data->skybox_set_layout.binding = 0;
+        data->skybox_set_layout.descriptors[0] = DESCRIPTOR_SAMPLER;
+        data->skybox_set_layout.descriptors[1] = DESCRIPTOR_IMAGE;
+        data->skybox_set_layout.descriptor_count = 2;
+        rhi_init_descriptor_set_layout(&data->skybox_set_layout);
+
+        rhi_init_descriptor_set(&data->skybox_set, &data->skybox_set_layout);
+        rhi_descriptor_set_write_sampler(&data->skybox_set, &data->cubemap_sampler, 0);
+        rhi_descriptor_set_write_image(&data->skybox_set, &data->cubemap, 1);
+
+        RHI_ShaderModule vs;
+        RHI_ShaderModule fs;
+
+        rhi_load_shader(&vs, "shaders/skybox.vert.spv");
+        rhi_load_shader(&fs, "shaders/skybox.frag.spv");
+
+        RHI_PipelineDescriptor descriptor;
+        descriptor.use_mesh_shaders = 0;
+        descriptor.reflect_input_layout = 0;
+        descriptor.depth_bounds_enable = 1;
+        descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
+        descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
+        descriptor.color_attachment_count = 1;
+        descriptor.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
+        descriptor.cull_mode = VK_CULL_MODE_NONE;
+        descriptor.depth_op = VK_COMPARE_OP_LESS_OR_EQUAL;
+        descriptor.polygon_mode = VK_POLYGON_MODE_FILL;
+        descriptor.primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        descriptor.push_constant_size = sizeof(hmm_mat4);
+        descriptor.set_layouts[0] = &data->skybox_set_layout;
+        descriptor.set_layout_count = 1;
+        descriptor.shaders.vs = &vs;
+        descriptor.shaders.ps = &fs;
+        descriptor.depth_biased_enable = 0;
+
+        rhi_init_graphics_pipeline(&data->skybox_pipeline, &descriptor);
+        
+        rhi_free_shader(&vs);
+        rhi_free_shader(&fs);
     }
 
     {
@@ -138,7 +338,12 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         data->deferred_set_layout.descriptors[1] = DESCRIPTOR_IMAGE;
         data->deferred_set_layout.descriptors[2] = DESCRIPTOR_IMAGE;
         data->deferred_set_layout.descriptors[3] = DESCRIPTOR_IMAGE;
-        data->deferred_set_layout.descriptor_count = 4;
+        data->deferred_set_layout.descriptors[4] = DESCRIPTOR_SAMPLER;
+        data->deferred_set_layout.descriptors[5] = DESCRIPTOR_IMAGE;
+        data->deferred_set_layout.descriptors[6] = DESCRIPTOR_IMAGE;
+        data->deferred_set_layout.descriptors[7] = DESCRIPTOR_IMAGE;
+        data->deferred_set_layout.descriptors[8] = DESCRIPTOR_IMAGE;
+        data->deferred_set_layout.descriptor_count = 9;
         rhi_init_descriptor_set_layout(&data->deferred_set_layout);
 
         rhi_init_descriptor_set(&data->deferred_set, &data->deferred_set_layout);
@@ -146,6 +351,11 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gNormal, 1);
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gAlbedo, 2);
         rhi_descriptor_set_write_image(&data->deferred_set, &data->gMetallicRoughness, 3);
+        rhi_descriptor_set_write_sampler(&data->deferred_set, &data->cubemap_sampler, 4);
+        rhi_descriptor_set_write_image(&data->deferred_set, &data->cubemap, 5);
+        rhi_descriptor_set_write_image(&data->deferred_set, &data->irradiance, 6);
+        rhi_descriptor_set_write_image(&data->deferred_set, &data->prefilter, 7);
+        rhi_descriptor_set_write_image(&data->deferred_set, &data->brdf, 8);
 
         data->params_set_layout.binding = 0;
         data->params_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
@@ -167,6 +377,7 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
         RHI_PipelineDescriptor descriptor;
         descriptor.use_mesh_shaders = 1;
+        descriptor.reflect_input_layout = 0;
         descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
         descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
         descriptor.color_attachments_formats[1] = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -190,6 +401,7 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         descriptor.shaders.ms = &ms;
         descriptor.shaders.ps = &fs;
         descriptor.depth_biased_enable = 0;
+        descriptor.depth_bounds_enable = 1;
 
         rhi_init_graphics_pipeline(&data->gbuffer_pipeline, &descriptor);
 
@@ -207,6 +419,7 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
         RHI_PipelineDescriptor descriptor;
         descriptor.use_mesh_shaders = 0;
+        descriptor.reflect_input_layout = 1;
         descriptor.front_face = VK_FRONT_FACE_CLOCKWISE;
         descriptor.color_attachment_count = 1;
         descriptor.color_attachments_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -253,9 +466,9 @@ void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
     {
         RHI_RenderBegin begin;
         memset(&begin, 0, sizeof(RHI_RenderBegin));
-        begin.r = 0.1f;
-	    begin.g = 0.1f;
-	    begin.b = 0.1f;
+        begin.r = 0.0f;
+	    begin.g = 0.0f;
+	    begin.b = 0.0f;
 	    begin.a = 1.0f;
 	    begin.has_depth = 1;
 	    begin.width = execute->width;
@@ -283,6 +496,7 @@ void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->gbuffer_pipeline, &execute->image_heap, 1);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->gbuffer_pipeline, &execute->sampler_heap, 2);
         rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &data->params_set, 5);
+        rhi_cmd_set_depth_bounds(cmd_buf, 0.0f, 0.999f);
 
         for (i32 i = 0; i < execute->drawable_count; i++)
         {
@@ -307,9 +521,9 @@ void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
     {
         RHI_RenderBegin begin;
         memset(&begin, 0, sizeof(RHI_RenderBegin));
-	    begin.r = 0.1f;
-	    begin.g = 0.1f;
-	    begin.b = 0.1f;
+	    begin.r = 0.0f;
+	    begin.g = 0.0f;
+	    begin.b = 0.0f;
 	    begin.a = 1.0f;
 	    begin.has_depth = 0;
 	    begin.width = execute->width;
@@ -321,11 +535,19 @@ void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
         data->first_render = 0;
 
         rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-
         hmm_vec4 temp = HMM_Vec4(execute->camera.pos.X, execute->camera.pos.Y, execute->camera.pos.Z, 1.0);
+
+        for (u32 i = 0; i < 6; i++)
+        {
+            rhi_cmd_img_transition_layout(cmd_buf, &data->cubemap, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, i);
+            rhi_cmd_img_transition_layout(cmd_buf, &data->irradiance, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, i);
+            rhi_cmd_img_transition_layout(cmd_buf, &data->prefilter, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, i);
+        }
+        rhi_cmd_img_transition_layout(cmd_buf, &data->brdf, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
 
         rhi_cmd_start_render(cmd_buf, begin);
         rhi_cmd_set_viewport(cmd_buf, execute->width, execute->height);
+
         rhi_cmd_set_pipeline(cmd_buf, &data->deferred_pipeline);
         rhi_cmd_set_descriptor_set(cmd_buf, &data->deferred_pipeline, &data->deferred_set, 0);
         rhi_cmd_set_descriptor_heap(cmd_buf, &data->deferred_pipeline, &execute->sampler_heap, 1);
@@ -334,9 +556,52 @@ void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
         rhi_cmd_set_push_constants(cmd_buf, &data->deferred_pipeline, &temp, sizeof(hmm_vec4));
         rhi_cmd_set_vertex_buffer(cmd_buf, &data->screen_vertex_buffer);
         rhi_cmd_draw(cmd_buf, 4);
-        rhi_cmd_end_render(cmd_buf);
 
+        rhi_cmd_end_render(cmd_buf);
+    
         rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
+    }
+
+    {
+        RHI_RenderBegin begin;
+        memset(&begin, 0, sizeof(RHI_RenderBegin));
+        begin.r = 0.0f;
+	    begin.g = 0.0f;
+	    begin.b = 0.0f;
+	    begin.a = 1.0f;
+	    begin.has_depth = 1;
+	    begin.width = execute->width;
+	    begin.height = execute->height;
+	    begin.images[0] = &node->outputs[0];
+        begin.images[1] = &node->outputs[1];
+	    begin.image_count = 2;
+        begin.read_depth = 1;
+        begin.read_color = 1;
+
+        rhi_cmd_start_render(cmd_buf, begin);
+        rhi_cmd_set_viewport(cmd_buf, execute->width, execute->height);
+
+        hmm_mat4 final_matrix = HMM_Mat4d(1.0f);
+
+        hmm_mat4 view = execute->camera.view;
+        view.Elements[3][0] = 0.0f;
+		view.Elements[3][1] = 0.0f;
+		view.Elements[3][2] = 0.0f;
+		view.Elements[0][3] = 0.0f;
+		view.Elements[1][3] = 0.0f;
+		view.Elements[2][3] = 0.0f;
+		view.Elements[3][3] = 1.0f;
+
+        final_matrix = HMM_MultiplyMat4(final_matrix, execute->camera.projection);
+        final_matrix = HMM_MultiplyMat4(final_matrix, view);
+
+        rhi_cmd_set_pipeline(cmd_buf, &data->skybox_pipeline);
+        rhi_cmd_set_push_constants(cmd_buf, &data->skybox_pipeline, &final_matrix, sizeof(hmm_mat4));
+        rhi_cmd_set_descriptor_set(cmd_buf, &data->skybox_pipeline, &data->skybox_set, 0);
+        rhi_cmd_set_depth_bounds(cmd_buf, 0.999f, 1.0f);
+        rhi_cmd_draw(cmd_buf, 36);
+
+        rhi_cmd_end_render(cmd_buf);
     }
 }
 
@@ -361,11 +626,30 @@ void geometry_pass_free(RenderGraphNode* node, RenderGraphExecute* execute)
 {
     geometry_pass* data = node->private_data;
 
+    rhi_free_descriptor_set(&data->brdf_set);
+    rhi_free_pipeline(&data->brdf_pipeline);
+    rhi_free_descriptor_set_layout(&data->brdf_set_layout);
+
+    rhi_free_descriptor_set(&data->prefilter_set);
+    rhi_free_pipeline(&data->prefilter_pipeline);
+    rhi_free_descriptor_set_layout(&data->prefilter_set_layout);
+
+    rhi_free_descriptor_set(&data->irradiance_set);
+    rhi_free_pipeline(&data->irradiance_pipeline);
+    rhi_free_descriptor_set_layout(&data->irradiance_set_layout);
+
+    rhi_free_descriptor_set(&data->skybox_set);
+    rhi_free_pipeline(&data->skybox_pipeline);
+    rhi_free_descriptor_set_layout(&data->skybox_set_layout);
+
     rhi_free_descriptor_set(&data->cubemap_set);
     rhi_free_descriptor_set_layout(&data->cubemap_set_layout);
     rhi_free_pipeline(&data->cubemap_pipeline);
+
+    rhi_free_image(&data->brdf);
+    rhi_free_image(&data->prefilter);
+    rhi_free_image(&data->irradiance);
     rhi_free_image(&data->cubemap);
-    rhi_free_image(&data->hdr_cubemap);
 
     rhi_free_image(&data->gPosition);
     rhi_free_image(&data->gNormal);

@@ -15,11 +15,16 @@ layout (location = 0) out vec4 OutColor;
 
 layout (location = 0) in vec2 fTexcoords;
 
-layout (binding = 0, set = 0) uniform texture2D gPosition;
-layout (binding = 1, set = 0) uniform texture2D gNormal;
-layout (binding = 2, set = 0) uniform texture2D gAlbedo;
-layout (binding = 3, set = 0) uniform texture2D gMetallicRoughness;
-layout (binding = 0, set = 1) uniform sampler   SamplerHeap[512];
+layout (binding = 0, set = 0) uniform texture2D     gPosition;
+layout (binding = 1, set = 0) uniform texture2D     gNormal;
+layout (binding = 2, set = 0) uniform texture2D     gAlbedo;
+layout (binding = 3, set = 0) uniform texture2D     gMetallicRoughness;
+layout (binding = 4, set = 0) uniform sampler       CubemapSampler;
+layout (binding = 5, set = 0) uniform textureCube   Cubemap;
+layout (binding = 6, set = 0) uniform textureCube   Irradiance;
+layout (binding = 7, set = 0) uniform textureCube   Prefilter;
+layout (binding = 8, set = 0) uniform texture2D     BRDF;
+layout (binding = 0, set = 1) uniform sampler       SamplerHeap[512];
 
 layout (binding = 0, set = 2) uniform Lights {
     PointLight lights[MAX_LIGHTS];
@@ -90,13 +95,11 @@ void main()
     vec4 Diffuse = texture(sampler2D(gAlbedo, SamplerHeap[0]), fTexcoords.xy);
     vec4 MR = texture(sampler2D(gMetallicRoughness, SamplerHeap[0]), fTexcoords.xy);
 
-    float metallic = MR.b;
-    float roughness = MR.g;
+    if (FragPos.x == 0.0f && FragPos.y == 0.0f && FragPos.z == 0.0f)
+        discard;
 
-    if (metallic == 0.0)
-        metallic = 0.1;
-    if (roughness == 0.0)
-        roughness = 0.5;
+    float metallic = MR.b;
+    float roughness = MR.g;    
 
     Diffuse.rgb = pow(Diffuse.rgb, vec3(2.2));
 
@@ -136,7 +139,22 @@ void main()
         Lo += (kD * Diffuse.rgb / PI + specular) * radiance * NdotL;    
     }      
 
-    vec3 ambient = vec3(0.03) * Diffuse.rgb * ao;
+    vec3 F = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+
+    vec3 kS = F;
+    vec3 kD = 1.0 - kS;
+    kD *= 1.0 - metallic;
+
+    vec3 irradiance = texture(samplerCube(Irradiance, CubemapSampler), N).rgb;
+    vec3 diffuse = irradiance * Diffuse.xyz;
+
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 prefilteredColor = textureLod(samplerCube(Prefilter, CubemapSampler), R, roughness * MAX_REFLECTION_LOD).rgb;   
+    vec2 brdf_uv = vec2(max(dot(N, V), 0.0), roughness);
+    vec2 brdf  = texture(sampler2D(BRDF, SamplerHeap[0]), brdf_uv).rg;
+    vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+
+    vec3 ambient = (kD * diffuse + specular) * ao;
     vec3 color = ambient + Lo;
 
     vec3 final_color = color;
@@ -146,5 +164,5 @@ void main()
     if (params.shade_meshlets)
         final_color = color;
 
-    OutColor = vec4(final_color, 1.0);
+    OutColor = vec4(final_color, 0.0);
 }

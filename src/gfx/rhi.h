@@ -24,6 +24,7 @@ TODO: Global Illumination
 #define DESCRIPTOR_HEAP_IMAGE 0
 #define DESCRIPTOR_HEAP_SAMPLER 1
 #define DESCRIPTOR_IMAGE VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+#define DESCRIPTOR_SAMPLED_IMAGE VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
 #define DESCRIPTOR_SAMPLER VK_DESCRIPTOR_TYPE_SAMPLER
 #define DESCRIPTOR_BUFFER VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
 #define DESCRIPTOR_STORAGE_IMAGE VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
@@ -110,6 +111,9 @@ struct RHI_PipelineDescriptor
     b32 ccw;
     VkCompareOp depth_op;
     b32 depth_biased_enable;
+    b32 depth_bounds_enable;
+
+    b32 reflect_input_layout;
 
     i32 color_attachment_count;
     VkFormat depth_attachment_format;
@@ -158,6 +162,8 @@ struct RHI_RenderBegin
     i32 width;
     i32 height;
     b32 has_depth;
+    b32 read_depth;
+    b32 read_color;
 
     f32 r, g, b, a;
 };
@@ -182,7 +188,9 @@ void rhi_free_descriptor_set_layout(RHI_DescriptorSetLayout* layout);
 // Descriptor set
 void rhi_init_descriptor_set(RHI_DescriptorSet* set, RHI_DescriptorSetLayout* layout);
 void rhi_free_descriptor_set(RHI_DescriptorSet* set);
+void rhi_descriptor_set_write_sampler(RHI_DescriptorSet* set, RHI_Sampler* sampler, i32 binding);
 void rhi_descriptor_set_write_image(RHI_DescriptorSet* set, RHI_Image* image, i32 binding);
+void rhi_descriptor_set_write_image_sampler(RHI_DescriptorSet* set, RHI_Image* image, RHI_Sampler* sampler, i32 binding);
 void rhi_descriptor_set_write_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding);
 void rhi_descriptor_set_write_storage_image(RHI_DescriptorSet* set, RHI_Image* image, RHI_Sampler* sampler, i32 binding);
 void rhi_descriptor_set_write_storage_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding);
@@ -234,6 +242,7 @@ void rhi_cmd_set_index_buffer(RHI_CommandBuffer* buf, RHI_Buffer* buffer);
 void rhi_cmd_set_descriptor_heap(RHI_CommandBuffer* buf, RHI_Pipeline* pipeline, RHI_DescriptorHeap* heap, i32 binding);
 void rhi_cmd_set_descriptor_set(RHI_CommandBuffer* buf, RHI_Pipeline* pipeline, RHI_DescriptorSet* set, i32 binding);
 void rhi_cmd_set_push_constants(RHI_CommandBuffer* buf, RHI_Pipeline* pipeline, void* data, u32 size);
+void rhi_cmd_set_depth_bounds(RHI_CommandBuffer* buf, f32 min, f32 max);
 void rhi_cmd_draw(RHI_CommandBuffer* buf, u32 count);
 void rhi_cmd_draw_indexed(RHI_CommandBuffer* buf, u32 count);
 void rhi_cmd_draw_meshlets(RHI_CommandBuffer* buf, u32 count);

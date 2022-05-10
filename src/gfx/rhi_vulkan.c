@@ -155,7 +155,7 @@ void rhi_make_instance()
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.pEngineName = "Aurora";
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    app_info.apiVersion = VK_API_VERSION_1_2;
+    app_info.apiVersion = VK_API_VERSION_1_3;
 
     VkInstanceCreateInfo create_info = {0};
     create_info.pNext = NULL;
@@ -747,6 +747,25 @@ void rhi_free_descriptor_set(RHI_DescriptorSet* set)
     vkFreeDescriptorSets(state.device, state.descriptor_pool, 1, &set->set);
 }
 
+void rhi_descriptor_set_write_sampler(RHI_DescriptorSet* set, RHI_Sampler* sampler, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_info.imageView = VK_NULL_HANDLE;
+    image_info.sampler = sampler->sampler;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pImageInfo = &image_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
 void rhi_descriptor_set_write_buffer(RHI_DescriptorSet* set, RHI_Buffer* buffer, i32 size, i32 binding)
 {
     VkDescriptorBufferInfo buffer_info = {0};
@@ -819,6 +838,25 @@ void rhi_descriptor_set_write_image(RHI_DescriptorSet* set, RHI_Image* image, i3
     write.dstArrayElement = 0;
     write.pImageInfo = &image_info;
     write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+    vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
+}
+
+void rhi_descriptor_set_write_image_sampler(RHI_DescriptorSet* set, RHI_Image* image, RHI_Sampler* sampler, i32 binding)
+{
+    VkDescriptorImageInfo image_info = {0};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_info.imageView = image->image_view;
+    image_info.sampler = sampler->sampler;
+
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set->set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.dstArrayElement = 0;
+    write.pImageInfo = &image_info;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
     vkUpdateDescriptorSets(state.device, 1, &write, 0, NULL);
 }
@@ -922,13 +960,11 @@ void rhi_init_graphics_pipeline(RHI_Pipeline* pipeline, RHI_PipelineDescriptor* 
     VkPipelineInputAssemblyStateCreateInfo input_assembly = {0};
     VkVertexInputAttributeDescription* attribute_descriptions = NULL;
     SpvReflectInterfaceVariable** vs_input_vars = NULL;
-    vertex_input_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     vertex_input_binding_desc.binding = 0;
     vertex_input_binding_desc.stride = 0; 
     vertex_input_binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    if (!descriptor->use_mesh_shaders)
+    if (descriptor->reflect_input_layout)
     {
         u32 vs_input_var_count = 0;
         spvReflectEnumerateInputVariables(&input_layout_reflect, &vs_input_var_count, 0);
@@ -963,20 +999,37 @@ void rhi_init_graphics_pipeline(RHI_Pipeline* pipeline, RHI_PipelineDescriptor* 
         vertex_input_state_info.pVertexBindingDescriptions = &vertex_input_binding_desc;
         vertex_input_state_info.vertexAttributeDescriptionCount = vs_input_var_count;
         vertex_input_state_info.pVertexAttributeDescriptions = attribute_descriptions;
-
-        input_assembly.topology = descriptor->primitive_topology;
-        input_assembly.primitiveRestartEnable = VK_FALSE;
+    }
+    else
+    {
+        vertex_input_state_info.vertexBindingDescriptionCount = 0;
+        vertex_input_state_info.pVertexBindingDescriptions = NULL;
+        vertex_input_state_info.vertexAttributeDescriptionCount = 0;
+        vertex_input_state_info.pVertexAttributeDescriptions = NULL;
     }
 
-    VkDynamicState states[3] = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_DEPTH_BIAS
-    };
+    input_assembly.topology = descriptor->primitive_topology;
+    input_assembly.primitiveRestartEnable = VK_FALSE;
+
+    VkDynamicState* states = malloc(sizeof(VkDynamicState) * 16);
+    states[0] = VK_DYNAMIC_STATE_VIEWPORT;
+    states[1] = VK_DYNAMIC_STATE_SCISSOR;
+    i32 current_idx = 2;
+
+    if (descriptor->depth_biased_enable)
+    {
+        states[current_idx] = VK_DYNAMIC_STATE_DEPTH_BIAS;
+        current_idx++;
+    }
+    if (descriptor->depth_bounds_enable)
+    {
+        states[current_idx] = VK_DYNAMIC_STATE_DEPTH_BOUNDS;
+        current_idx++;
+    }
 
     VkPipelineDynamicStateCreateInfo dynamic_state = {0};
     dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamic_state.dynamicStateCount = descriptor->depth_biased_enable ? 3 : 2;
+    dynamic_state.dynamicStateCount = current_idx;
     dynamic_state.pDynamicStates = states;
 
     VkViewport viewport = {0};
@@ -1091,14 +1144,15 @@ void rhi_init_graphics_pipeline(RHI_Pipeline* pipeline, RHI_PipelineDescriptor* 
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.pNext = &rendering_create_info;
 
-    if (!descriptor->use_mesh_shaders)
-    {
-        pipeline_info.pVertexInputState = &vertex_input_state_info;
-        pipeline_info.pInputAssemblyState = &input_assembly;
-    }
+    vertex_input_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    pipeline_info.pVertexInputState = &vertex_input_state_info;
+    pipeline_info.pInputAssemblyState = &input_assembly;
 
     res = vkCreateGraphicsPipelines(state.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline->pipeline);
     vk_check(res);
+
+    free(states);
 }
 
 void rhi_init_compute_pipeline(RHI_Pipeline* pipeline, RHI_PipelineDescriptor* descriptor)
@@ -1792,6 +1846,11 @@ void rhi_cmd_set_push_constants(RHI_CommandBuffer* buf, RHI_Pipeline* pipeline, 
     vkCmdPushConstants(buf->buf, pipeline->pipeline_layout, VK_SHADER_STAGE_ALL, 0, size, data);
 }
 
+void rhi_cmd_set_depth_bounds(RHI_CommandBuffer* buf, f32 min, f32 max)
+{
+    vkCmdSetDepthBounds(buf->buf, min, max);
+}
+
 void rhi_cmd_draw_indexed(RHI_CommandBuffer* buf, u32 count)
 {
     vkCmdDrawIndexed(buf->buf, count, 1, 0, 0, 0);
@@ -1846,8 +1905,8 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
         color_attachment_info.imageView = image->image_view;
         color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
-        color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        color_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment_info.loadOp = info.read_color == 1 ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment_info.storeOp = info.read_color == 1 ? VK_ATTACHMENT_STORE_OP_NONE : VK_ATTACHMENT_STORE_OP_STORE;
         color_attachment_info.clearValue = clear_value;
 
         color_attachments[i] = color_attachment_info;
@@ -1858,7 +1917,7 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
         RHI_Image* image = info.images[color_iterator];
 
         VkClearValue depth_clear_value = { 0 };
-        depth_clear_value.depthStencil.depth = 1.0f;
+        depth_clear_value.depthStencil.depth = info.read_depth == 1 ? 0.0F : 1.0f;
         depth_clear_value.depthStencil.stencil = 0.0f;
 
         VkRenderingAttachmentInfoKHR depth_attachment = { 0 };
@@ -1866,8 +1925,8 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
         depth_attachment.imageView = image->image_view;
         depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         depth_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
-        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depth_attachment.loadOp = info.read_depth == 1 ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment.storeOp = info.read_depth == 1 ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
         depth_attachment.clearValue = depth_clear_value;
 
         rendering_info.pStencilAttachment = &depth_attachment;
