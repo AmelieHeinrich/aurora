@@ -25,8 +25,6 @@ extern AuroraPlatformLayer platform;
 
 void  aurora_platform_layer_init();
 void  aurora_platform_layer_free();
-void* aurora_platform_layer_halloc(u32 size);
-void  aurora_platform_layer_hfree(void* mem);
 char* aurora_platform_read_file(const char* path, u32* out_size);
 void  aurora_platform_open_window(const char* title);
 void  aurora_platform_update_window();

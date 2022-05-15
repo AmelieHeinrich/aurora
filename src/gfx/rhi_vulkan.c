@@ -554,12 +554,10 @@ void rhi_make_descriptors()
     res = vkCreateDescriptorSetLayout(state.device, &set_layout_info, NULL, &state.sampler_heap_layout);
     vk_check(res);
 
-    state.rhi_image_heap.binding = 0;
     state.rhi_image_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     state.rhi_image_heap.descriptor_count = 2048;
     state.rhi_image_heap.layout = state.image_heap_layout;
 
-    state.rhi_sampler_heap.binding = 1;
     state.rhi_sampler_heap.descriptors[0] = VK_DESCRIPTOR_TYPE_SAMPLER;
     state.rhi_sampler_heap.descriptor_count = 2048;
     state.rhi_sampler_heap.layout = state.sampler_heap_layout;
@@ -1626,7 +1624,7 @@ void rhi_resize_image(RHI_Image* image, i32 width, i32 height)
 void rhi_init_descriptor_heap(RHI_DescriptorHeap* heap, u32 type, u32 size)
 {
     memset(heap, 0, sizeof(RHI_DescriptorHeap));
-    heap->heap_handle = aurora_platform_layer_halloc(sizeof(b32) * size);
+    heap->heap_handle = malloc(sizeof(b32) * size);
     memset(heap->heap_handle, 0, sizeof(b32) * size);
     heap->type = type;
     heap->used = 0;

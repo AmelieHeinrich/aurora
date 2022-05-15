@@ -1,7 +1,7 @@
 #include "game.h"
 
 #include <core/platform_layer.h>
-#include <core/random_gen.h>
+#include <core/random.h>
 #include <client/camera.h>
 #include <gfx/rhi.h>
 #include <gfx/render_graph.h>
@@ -59,13 +59,13 @@ void game_init()
 
     for (i32 i = 0; i < TEST_LIGHT_COUNT; i++)
 	{
-		data.rge.light_info.lights[i].position.X = float_rand(-3.0f, 3.0f);
-		data.rge.light_info.lights[i].position.Y = float_rand(-1.0f, -5.0f);
-		data.rge.light_info.lights[i].position.Z = float_rand(-3.0f, 3.0f);
+		data.rge.light_info.lights[i].position.X = random_float(-3.0f, 3.0f);
+		data.rge.light_info.lights[i].position.Y = random_float(-1.0f, -5.0f);
+		data.rge.light_info.lights[i].position.Z = random_float(-3.0f, 3.0f);
 
-		data.rge.light_info.lights[i].color.X = float_rand(0.1f, 4.0f);
-		data.rge.light_info.lights[i].color.Y = float_rand(0.1f, 4.0f);
-		data.rge.light_info.lights[i].color.Z = float_rand(0.1f, 4.0f);
+		data.rge.light_info.lights[i].color.X = random_float(0.1f, 4.0f);
+		data.rge.light_info.lights[i].color.Y = random_float(0.1f, 4.0f);
+		data.rge.light_info.lights[i].color.Z = random_float(0.1f, 4.0f);
 	}
 	data.rge.light_info.light_count = TEST_LIGHT_COUNT;
 

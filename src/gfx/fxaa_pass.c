@@ -25,7 +25,6 @@ void fxaa_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     node->output_count = 1;
 
     {
-        data->fxaa_set_layout.binding = 0;
         data->fxaa_set_layout.descriptor_count = 1;
         data->fxaa_set_layout.descriptors[0] = DESCRIPTOR_IMAGE;
         rhi_init_descriptor_set_layout(&data->fxaa_set_layout);

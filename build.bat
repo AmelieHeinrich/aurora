@@ -24,7 +24,7 @@ if %debug%==true (
 )
 
 set output=aurora
-set flags=-nologo -FC -Zi -W2 /MP -DVK_NO_PROTOTYPES -DVK_USE_PLATFORM_WIN32_KHR
+set flags=-nologo -FC -Zi -W2 /MP -DVK_NO_PROTOTYPES -DVK_USE_PLATFORM_WIN32_KHR -D_NO_DEBUG_HEAP
 set disabledWarnings=-wd4100 -wd4201 -wd4018 -wd4099 -wd4189 -wd4505 -wd4530 -wd4840 -wd4324 -wd4459 -wd4702 -wd4244 -wd4310 -wd4611 -wd4996
 set source= %rootDir%/src/*.c %rootDir%/src/resource/*.c %rootDir%/src/gfx/*.c %rootDir%/src/core/*.c %rootDir%/src/client/*.c
 set links=user32.lib shlwapi.lib volk.lib vma.lib spirv_reflect.lib stb_image.lib cgltf.lib

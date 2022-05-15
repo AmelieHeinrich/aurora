@@ -87,16 +87,6 @@ void aurora_platform_free_window()
 	DestroyWindow(windows.hwnd);
 }
 
-void* aurora_platform_layer_halloc(u32 size)
-{
-	return HeapAlloc(GetProcessHeap(), 0, size);
-}
-
-void aurora_platform_layer_hfree(void* mem)
-{
-	HeapFree(GetProcessHeap(), 0, mem);
-}
-
 char* aurora_platform_read_file(const char* path, u32* out_size)
 {
 	FILE* file = fopen(path, "rb");

@@ -3,7 +3,7 @@
 
 /*
 Renderer TODOs:
-TODO: PBR environment maps
+TODO: SSAO
 TODO: Shadows
 TODO: Global Illumination
 */
@@ -79,7 +79,6 @@ struct RHI_DescriptorSetLayout
 {
     u32 descriptors[32];
     u32 descriptor_count;
-    u32 binding;
 
     VkDescriptorSetLayout layout;
 };

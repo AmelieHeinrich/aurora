@@ -32,12 +32,10 @@ void init_render_graph(RenderGraph* graph, RenderGraphExecute* execute)
     mesh_loader_set_sampler_heap(&execute->sampler_heap);
 	mesh_loader_init(4);
 
-    execute->camera_descriptor_set_layout.binding = 1;
     execute->camera_descriptor_set_layout.descriptor_count = 1;
     execute->camera_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     rhi_init_descriptor_set_layout(&execute->camera_descriptor_set_layout);
 
-    execute->light_descriptor_set_layout.binding = 2;
     execute->light_descriptor_set_layout.descriptor_count = 1;
     execute->light_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     rhi_init_descriptor_set_layout(&execute->light_descriptor_set_layout);

@@ -54,12 +54,10 @@ void push_meshlet(meshlet_vector* vec, Meshlet m)
 
 void mesh_loader_init(i32 dset_layout_binding)
 {
-    s_descriptor_set_layout.binding = dset_layout_binding;
     s_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;
     s_descriptor_set_layout.descriptor_count = 1;
     rhi_init_descriptor_set_layout(&s_descriptor_set_layout);
 
-    s_meshlet_set_layout.binding = 0;
     s_meshlet_set_layout.descriptors[0] = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     s_meshlet_set_layout.descriptors[1] = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     s_meshlet_set_layout.descriptor_count = 2;
