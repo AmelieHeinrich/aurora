@@ -43,6 +43,8 @@ void game_resize(u32 width, u32 height)
 
 void game_init()
 {
+	data.update_frustum = 1;
+
     srand(time(NULL));
 
     aurora_platform_layer_init();
