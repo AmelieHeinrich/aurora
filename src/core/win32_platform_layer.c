@@ -181,3 +181,110 @@ f32 aurora_platform_get_mouse_y()
 	GetCursorPos(&p);
 	return p.y;
 }
+
+struct Thread
+{
+	HANDLE handle;
+	DWORD id;
+	void* ptr;
+	b32 working;
+	AuroraThreadWorker worker;
+};
+
+DWORD WINAPI _thread_worker(LPVOID lparam)
+{
+	Thread* thread = (Thread*)lparam;
+
+	thread->working = 1;
+	thread->worker(thread);
+	thread->working = 0;
+
+	return 0;
+}
+
+Thread* aurora_platform_new_thread(AuroraThreadWorker worker)
+{
+	Thread* thread = malloc(sizeof(Thread));
+	thread->worker = worker;
+	return thread;
+}
+
+void aurora_platform_free_thread(Thread* thread)
+{
+	aurora_platform_join_thread(thread);
+	free(thread);
+}
+
+void aurora_platform_execute_thread(Thread* thread)
+{
+	thread->handle = CreateThread(NULL, 0, _thread_worker, thread, 0, &thread->id);
+}
+
+void aurora_platform_join_thread(Thread* thread)
+{
+	if (!thread->handle) return;
+
+	WaitForSingleObject(thread->handle, INFINITE);
+	CloseHandle(thread->handle);
+	thread->handle = 0;
+}
+
+b32 aurora_platform_active_thread(Thread* thread)
+{
+	return thread->working;
+}
+
+void* aurora_platform_get_thread_ptr(Thread* thread)
+{
+	return thread->ptr;
+}
+
+void aurora_platform_set_thread_ptr(Thread* thread, void* ptr)
+{
+	thread->ptr = ptr;
+}
+
+struct Mutex
+{
+	HANDLE handle;
+	
+	void* ptr;
+};
+
+Mutex* aurora_platform_new_mutex(u64 size)
+{
+	Mutex* mutex = malloc(sizeof(Mutex));
+
+	mutex->handle = CreateMutex(NULL, 0, NULL);
+
+	if (size > 0) {
+		mutex->ptr = malloc(size);
+	}
+
+	return mutex;
+}
+
+void aurora_platform_free_mutex(Mutex* mutex)
+{
+	CloseHandle(mutex->handle);
+
+	if (mutex->ptr)
+		free(mutex->ptr);
+
+	free(mutex);
+}
+
+void aurora_platform_lock_mutex(Mutex* mutex)
+{
+	WaitForSingleObject(mutex->handle, INFINITE);
+}
+
+void aurora_platform_unlock_mutex(Mutex* mutex)
+{
+	ReleaseMutex(mutex->handle);
+}
+
+void* aurora_platform_mutex_get_ptr(Mutex* mutex)
+{
+	return mutex->ptr;
+}

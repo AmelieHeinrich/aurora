@@ -1,5 +1,7 @@
 #include "mesh.h"
 
+#include <core/platform_layer.h>
+
 #include <cgltf.h>
 
 #include <assert.h>
@@ -134,6 +136,27 @@ void* cgltf_get_accessor_data(cgltf_accessor* accessor, u32* component_size, u32
 
     cgltf_buffer_view* view = accessor->buffer_view;
     return OFFSET_PTR_BYTES(void, view->buffer->data, view->offset);
+}
+
+void mesh_load_albedo(Thread* thread)
+{
+    GLTFMaterial* mat = (GLTFMaterial*)aurora_platform_get_thread_ptr(thread);
+
+    rhi_load_raw_image(&mat->raw_color, mat->albedo_path);
+}
+
+void mesh_load_normal(Thread* thread)
+{
+    GLTFMaterial* mat = (GLTFMaterial*)aurora_platform_get_thread_ptr(thread);
+
+    rhi_load_raw_image(&mat->raw_normal, mat->normal_path);
+}
+
+void mesh_load_pbr(Thread* thread)
+{
+    GLTFMaterial* mat = (GLTFMaterial*)aurora_platform_get_thread_ptr(thread);
+
+    rhi_load_raw_image(&mat->raw_pbr, mat->mr_path);
 }
 
 void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_index, Mesh* m)
@@ -350,57 +373,88 @@ void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_in
     {
         if (cgltf_primitive->material)
         {
+            Thread* albedo_thread = aurora_platform_new_thread(mesh_load_albedo);
+            Thread* normal_thread = aurora_platform_new_thread(mesh_load_normal);
+            Thread* pbr_thread = aurora_platform_new_thread(mesh_load_pbr);
+
             pri->material_index = m->material_count;
 
+            aurora_platform_set_thread_ptr(albedo_thread, &m->materials[pri->material_index]);
+            aurora_platform_set_thread_ptr(normal_thread, &m->materials[pri->material_index]);
+            aurora_platform_set_thread_ptr(pbr_thread, &m->materials[pri->material_index]);
+
+            sprintf(m->materials[pri->material_index].albedo_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.base_color_texture.texture->image->uri);
+
+            if (cgltf_primitive->material->normal_texture.texture) 
             {
-                char tx_path[512];
-                sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.base_color_texture.texture->image->uri);
-                printf("%s\n", tx_path);
-
-                rhi_load_image(&m->materials[pri->material_index].albedo, tx_path);
-                m->materials[pri->material_index].albedo_bindless_index = rhi_find_available_descriptor(s_image_heap);
-                rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].albedo, m->materials[pri->material_index].albedo_bindless_index);
-
-                m->materials[pri->material_index].albedo_sampler.filter = VK_FILTER_LINEAR;
-                m->materials[pri->material_index].albedo_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-                rhi_init_sampler(&m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo.mip_levels);
-                m->materials[pri->material_index].albedo_sampler_index = rhi_find_available_descriptor(s_sampler_heap);
-                rhi_push_descriptor_heap_sampler(s_sampler_heap, &m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo_sampler_index);
+                m->materials[pri->material_index].has_normal = 1;
+                sprintf(m->materials[pri->material_index].normal_path, "%s%s", m->directory, cgltf_primitive->material->normal_texture.texture->image->uri);
+            }
             
-                m->materials[pri->material_index].base_color_factor.X = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[0];
-                m->materials[pri->material_index].base_color_factor.Y = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[1];
-                m->materials[pri->material_index].base_color_factor.Z = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[2];
-            }
-
+            if (cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture)
             {
-                if (cgltf_primitive->material->normal_texture.texture)
-                {
-                    char tx_path[512];
-                    sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->normal_texture.texture->image->uri);
-                    printf("%s\n", tx_path);
-
-                    rhi_load_image(&m->materials[pri->material_index].normal, tx_path);
-                    m->materials[pri->material_index].normal_bindless_index = rhi_find_available_descriptor(s_image_heap);
-                    rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].normal, m->materials[pri->material_index].normal_bindless_index);
-                }
+                m->materials[pri->material_index].has_metallic = 1;
+                sprintf(m->materials[pri->material_index].mr_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture->image->uri);
             }
 
+            if (MULTITHREADING_ENABLED)
             {
-                if (cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture)
-                {
-                    char tx_path[512];
-                    sprintf(tx_path, "%s%s", m->directory, cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture->image->uri);
-                    printf("%s\n", tx_path);
+                aurora_platform_execute_thread(albedo_thread);
+                if (m->materials[pri->material_index].has_normal) aurora_platform_execute_thread(normal_thread);
+                if (m->materials[pri->material_index].has_metallic) aurora_platform_execute_thread(pbr_thread);
 
-                    rhi_load_image(&m->materials[pri->material_index].metallic_roughness, tx_path);
-                    m->materials[pri->material_index].metallic_roughness_index = rhi_find_available_descriptor(s_image_heap);
-                    rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].metallic_roughness, m->materials[pri->material_index].metallic_roughness_index);
-                
-                    m->materials[pri->material_index].metallic_factor = cgltf_primitive->material->pbr_metallic_roughness.metallic_factor;
-                    m->materials[pri->material_index].roughness_factor = cgltf_primitive->material->pbr_metallic_roughness.roughness_factor;
-                }
+                aurora_platform_join_thread(albedo_thread);
+                if (m->materials[pri->material_index].has_normal) aurora_platform_join_thread(normal_thread);
+                if (m->materials[pri->material_index].has_metallic) aurora_platform_join_thread(pbr_thread);
             }
+            else
+            {
+                rhi_load_raw_image(&m->materials[pri->material_index].raw_color,  m->materials[pri->material_index].albedo_path);
+                if (m->materials[pri->material_index].has_normal) rhi_load_raw_image(&m->materials[pri->material_index].raw_normal, m->materials[pri->material_index].normal_path);
+                if (m->materials[pri->material_index].has_metallic) rhi_load_raw_image(&m->materials[pri->material_index].raw_pbr,    m->materials[pri->material_index].mr_path);
+            }
+
+            aurora_platform_free_thread(albedo_thread);
+            aurora_platform_free_thread(normal_thread);
+            aurora_platform_free_thread(pbr_thread);
+
+            rhi_upload_image(&m->materials[pri->material_index].albedo, &m->materials[pri->material_index].raw_color, 1);
+            rhi_free_raw_image(&m->materials[pri->material_index].raw_color);
+            m->materials[pri->material_index].albedo_bindless_index = rhi_find_available_descriptor(s_image_heap);
+            rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].albedo, m->materials[pri->material_index].albedo_bindless_index);
+
+            m->materials[pri->material_index].albedo_sampler.filter = VK_FILTER_LINEAR;
+            m->materials[pri->material_index].albedo_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+            rhi_init_sampler(&m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo.mip_levels);
+            m->materials[pri->material_index].albedo_sampler_index = rhi_find_available_descriptor(s_sampler_heap);
+            rhi_push_descriptor_heap_sampler(s_sampler_heap, &m->materials[pri->material_index].albedo_sampler, m->materials[pri->material_index].albedo_sampler_index);
+            
+            m->materials[pri->material_index].base_color_factor.X = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[0];
+            m->materials[pri->material_index].base_color_factor.Y = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[1];
+            m->materials[pri->material_index].base_color_factor.Z = cgltf_primitive->material->pbr_metallic_roughness.base_color_factor[2];
+
+            if (cgltf_primitive->material->normal_texture.texture)
+            {     
+                rhi_upload_image(&m->materials[pri->material_index].normal, &m->materials[pri->material_index].raw_normal, 0);
+                rhi_free_raw_image(&m->materials[pri->material_index].raw_normal);
+                m->materials[pri->material_index].normal_bindless_index = rhi_find_available_descriptor(s_image_heap);
+                rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].normal, m->materials[pri->material_index].normal_bindless_index);
+            }
+
+            
+            if (cgltf_primitive->material->pbr_metallic_roughness.metallic_roughness_texture.texture)
+            {
+                rhi_upload_image(&m->materials[pri->material_index].metallic_roughness, &m->materials[pri->material_index].raw_pbr, 0);
+                rhi_free_raw_image(&m->materials[pri->material_index].raw_pbr);
+
+                m->materials[pri->material_index].metallic_roughness_index = rhi_find_available_descriptor(s_image_heap);
+                rhi_push_descriptor_heap_image(s_image_heap, &m->materials[pri->material_index].metallic_roughness, m->materials[pri->material_index].metallic_roughness_index);
+            
+                m->materials[pri->material_index].metallic_factor = cgltf_primitive->material->pbr_metallic_roughness.metallic_factor;
+                m->materials[pri->material_index].roughness_factor = cgltf_primitive->material->pbr_metallic_roughness.roughness_factor;
+            }
+            
         
             temp_mat temp;
             temp.albedo_idx = m->materials[pri->material_index].albedo_bindless_index;

@@ -369,7 +369,7 @@ void rhi_make_swapchain()
     create_info.pQueueFamilyIndices = queue_family_indices;
     create_info.preTransform = capabilities.currentTransform;
     create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR; // TODO(milo): setting to enable vsync?
+    create_info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR; // TODO(milo): setting to enable vsync?
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = VK_NULL_HANDLE;
     create_info.imageFormat = formats[0].format;
@@ -1409,27 +1409,45 @@ void rhi_generate_mipmaps(RHI_Image* image)
     rhi_submit_cmd_buf(&cmd_buf);
 }
 
-void rhi_load_image(RHI_Image* image, const char* path)
+void rhi_load_raw_image(RHI_RawImage* image, const char* path)
 {
-    i32 width, height, channels = 0;
-    u8* data = stbi_load(path, &width, &height, &channels, STBI_rgb_alpha);
-    assert(data);
-    i64 image_size = width * height * 4;
-
+    u32 channels;
+    image->data = stbi_load(path, &image->width, &image->height, &channels, STBI_rgb_alpha);
+    assert(image->data);
+    image->data_size = image->width * image->height * 4;
     image->format = VK_FORMAT_R8G8B8A8_UNORM;
-    image->extent.width = width;
-    image->extent.height = height;
-    image->width = width;
-    image->height = height;
+}
+
+void rhi_load_raw_hdr_image(RHI_RawImage* image, const char* path)
+{
+    u32 channels;
+    image->data = stbi_load_16(path, &image->width, &image->height, &channels, STBI_rgb_alpha);
+    assert(image->data);
+    image->data_size = image->width * image->height * 4 * sizeof(u16);
+    image->format = VK_FORMAT_R16G16B16A16_UNORM;
+}
+
+void rhi_free_raw_image(RHI_RawImage* image)
+{
+    free(image->data);
+}
+
+void rhi_upload_image(RHI_Image* image, RHI_RawImage* raw_image, b32 gen_mips)
+{
+    image->format = raw_image->format;
+    image->extent.width = raw_image->width;
+    image->extent.height = raw_image->height;
+    image->width = raw_image->width;
+    image->height = raw_image->height;
     image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     image->image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image->mip_levels = (u32)(floor(log2(max(width, height))) + 1);
+    image->mip_levels = gen_mips == 1 ? (u32)(floor(log2(max(image->width, image->height))) + 1) : 1;
     
     VkImageCreateInfo image_create_info = { 0 };
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = width;
-    image_create_info.extent.height = height;
+    image_create_info.extent.width = raw_image->width;
+    image_create_info.extent.height = raw_image->height;
     image_create_info.format = image->format;
     image_create_info.extent.depth = 1;
     image_create_info.mipLevels = image->mip_levels;
@@ -1453,7 +1471,7 @@ void rhi_load_image(RHI_Image* image, const char* path)
     VkBufferCreateInfo staging_buffer_info = { 0 };
     staging_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     staging_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    staging_buffer_info.size = image_size;
+    staging_buffer_info.size = raw_image->data_size;
 
     VmaAllocationCreateInfo staging_buffer_alloc_info = { 0 };
     staging_buffer_alloc_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
@@ -1463,7 +1481,7 @@ void rhi_load_image(RHI_Image* image, const char* path)
 
     void* upload_data;
     vmaMapMemory(state.allocator, staging_buffer_allocation, &upload_data);
-    memcpy(upload_data, data, image_size);
+    memcpy(upload_data, raw_image->data, raw_image->data_size);
     vmaUnmapMemory(state.allocator, staging_buffer_allocation);
 
     VkBufferImageCopy image_copy_region = {0};
@@ -1471,8 +1489,8 @@ void rhi_load_image(RHI_Image* image, const char* path)
     image_copy_region.imageSubresource.mipLevel = 0;
     image_copy_region.imageSubresource.baseArrayLayer = 0;
     image_copy_region.imageSubresource.layerCount = 1;
-    image_copy_region.imageExtent.width = width;
-    image_copy_region.imageExtent.height = height;
+    image_copy_region.imageExtent.width = image->width;
+    image_copy_region.imageExtent.height = image->height;
     image_copy_region.imageExtent.depth = 1;
 
     RHI_CommandBuffer temp;
@@ -1480,11 +1498,11 @@ void rhi_load_image(RHI_Image* image, const char* path)
     rhi_begin_cmd_buf(&temp);
     rhi_cmd_img_transition_layout(&temp, image, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
     vkCmdCopyBufferToImage(temp.buf, staging_buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy_region);
+    if (!gen_mips) rhi_cmd_img_transition_layout(&temp, image, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
     rhi_end_cmd_buf(&temp);
     rhi_submit_upload_cmd_buf(&temp);
 
     vmaDestroyBuffer(state.allocator, staging_buffer, staging_buffer_allocation);
-    stbi_image_free(data);
 
     VkImageViewCreateInfo view_info = { 0 };
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1504,104 +1522,7 @@ void rhi_load_image(RHI_Image* image, const char* path)
     res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
     assert(res == VK_SUCCESS);
 
-    rhi_generate_mipmaps(image);
-}
-
-void rhi_load_hdr_image(RHI_Image* image, const char* path)
-{
-    i32 width, height, channels = 0;
-    u16* data = stbi_load_16(path, &width, &height, &channels, STBI_rgb_alpha);
-    assert(data);
-    i64 image_size = width * height * 4 * sizeof(u16);
-
-    image->format = VK_FORMAT_R16G16B16A16_UNORM;
-    image->extent.width = width;
-    image->extent.height = height;
-    image->width = width;
-    image->height = height;
-    image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-    image->image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image->mip_levels = 1;
-    
-    VkImageCreateInfo image_create_info = { 0 };
-    image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = width;
-    image_create_info.extent.height = height;
-    image_create_info.format = image->format;
-    image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 1;
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VmaAllocationCreateInfo allocation = { 0 };
-    allocation.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-    VkResult res = vmaCreateImage(state.allocator, &image_create_info, &allocation, &image->image, &image->allocation, NULL);
-    vk_check(res);
-
-    VkBuffer staging_buffer = VK_NULL_HANDLE;
-    VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
-    VmaAllocationInfo staging_buffer_allocation_info = {0};
-
-    VkBufferCreateInfo staging_buffer_info = { 0 };
-    staging_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    staging_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    staging_buffer_info.size = image_size;
-
-    VmaAllocationCreateInfo staging_buffer_alloc_info = { 0 };
-    staging_buffer_alloc_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-
-    res = vmaCreateBuffer(state.allocator, &staging_buffer_info, &staging_buffer_alloc_info, &staging_buffer, &staging_buffer_allocation, NULL);
-    vk_check(res);
-
-    void* upload_data;
-    vmaMapMemory(state.allocator, staging_buffer_allocation, &upload_data);
-    memcpy(upload_data, data, image_size);
-    vmaUnmapMemory(state.allocator, staging_buffer_allocation);
-
-    VkBufferImageCopy image_copy_region = {0};
-    image_copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_copy_region.imageSubresource.mipLevel = 0;
-    image_copy_region.imageSubresource.baseArrayLayer = 0;
-    image_copy_region.imageSubresource.layerCount = 1;
-    image_copy_region.imageExtent.width = width;
-    image_copy_region.imageExtent.height = height;
-    image_copy_region.imageExtent.depth = 1;
-
-    RHI_CommandBuffer temp;
-    rhi_init_upload_cmd_buf(&temp);
-    rhi_begin_cmd_buf(&temp);
-    rhi_cmd_img_transition_layout(&temp, image, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
-    vkCmdCopyBufferToImage(temp.buf, staging_buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy_region);
-    rhi_cmd_img_transition_layout(&temp, image, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
-    rhi_end_cmd_buf(&temp);
-    rhi_submit_upload_cmd_buf(&temp);
-
-    vmaDestroyBuffer(state.allocator, staging_buffer, staging_buffer_allocation);
-    stbi_image_free(data);
-
-    VkImageViewCreateInfo view_info = { 0 };
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = image->image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = image->format;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
-    assert(res == VK_SUCCESS);
+    if (gen_mips) rhi_generate_mipmaps(image);
 }
 
 void rhi_free_image(RHI_Image* image)

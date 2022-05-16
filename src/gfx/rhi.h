@@ -35,6 +35,17 @@ TODO: Global Illumination
 
 #include <core/common.h>
 
+typedef struct RHI_RawImage RHI_RawImage;
+struct RHI_RawImage
+{
+    void* data;
+    u32 width;
+    u32 height;
+    u64 data_size;
+
+    VkFormat format;
+};
+
 typedef struct RHI_Image RHI_Image;
 struct RHI_Image
 {
@@ -210,11 +221,15 @@ void rhi_allocate_buffer(RHI_Buffer* buffer, u64 size, u32 buffer_usage);
 void rhi_free_buffer(RHI_Buffer* buffer);
 void rhi_upload_buffer(RHI_Buffer* buffer, void* data, u64 size);
 
+// Raw Image
+void rhi_load_raw_image(RHI_RawImage* image, const char* path);
+void rhi_load_raw_hdr_image(RHI_RawImage* image, const char* path);
+void rhi_free_raw_image(RHI_RawImage* image);
+
 // Image
 void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage);
 void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage);
-void rhi_load_image(RHI_Image* image, const char* path);
-void rhi_load_hdr_image(RHI_Image* image, const char* path);
+void rhi_upload_image(RHI_Image* image, RHI_RawImage* raw_image, b32 gen_mips);
 void rhi_free_image(RHI_Image* image);
 void rhi_resize_image(RHI_Image* image, i32 width, i32 height);
 

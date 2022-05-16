@@ -1,6 +1,7 @@
 #include "geometry_pass.h"
 
 #include <core/platform_layer.h>
+#include <stdio.h>
 
 typedef struct geometry_pass geometry_pass;
 struct geometry_pass
@@ -93,7 +94,11 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     data->cubemap_sampler.filter = VK_FILTER_LINEAR;
     rhi_init_sampler(&data->cubemap_sampler, 1);
 
-    rhi_load_hdr_image(&data->hdr_cubemap, "assets/env_map.hdr");
+    RHI_RawImage raw_hdr;
+    rhi_load_raw_hdr_image(&raw_hdr, "assets/env_map.hdr");
+    
+    rhi_upload_image(&data->hdr_cubemap, &raw_hdr, 0);
+    rhi_free_raw_image(&raw_hdr);
     rhi_allocate_cubemap(&data->cubemap, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
     rhi_allocate_cubemap(&data->irradiance, 128, 128, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
     rhi_allocate_cubemap(&data->prefilter, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
@@ -429,6 +434,8 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 
 void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
 {
+    f64 start = aurora_platform_get_time();
+
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
     begin.r = 0.0f;
@@ -481,10 +488,16 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     rhi_cmd_img_transition_layout(cmd_buf, &data->gMetallicRoughness, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
 
     rhi_cmd_end_render(cmd_buf);
+
+    f64 end = aurora_platform_get_time();
+
+    printf("Geometry Pass: GBuffer execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
 {
+    f64 start = aurora_platform_get_time();
+
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
 	begin.r = 0.0f;
@@ -526,10 +539,16 @@ void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode*
     rhi_cmd_end_render(cmd_buf);
 
     rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
+
+    f64 end = aurora_platform_get_time();
+
+    printf("Geometry Pass: Deferred execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_execute_skybox(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
 {
+    f64 start = aurora_platform_get_time();
+
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
     begin.r = 0.0f;
@@ -569,6 +588,10 @@ void geometry_pass_execute_skybox(RHI_CommandBuffer* cmd_buf, RenderGraphNode* n
     rhi_cmd_draw(cmd_buf, 36);
 
     rhi_cmd_end_render(cmd_buf);
+
+    f64 end = aurora_platform_get_time();
+
+    printf("Geometry Pass: Skybox execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)

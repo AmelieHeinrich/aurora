@@ -69,6 +69,8 @@ void game_init()
 	}
 	data.rge.light_info.light_count = TEST_LIGHT_COUNT;
 
+	f64 start = aurora_platform_get_time();
+
 #if TEST_MODEL_SPONZA
 	mesh_load(&data.test_model.m, "assets/Sponza.gltf");
 	data.test_model.model_matrix = HMM_Mat4d(1.0f);
@@ -80,6 +82,8 @@ void game_init()
 	data.test_model.model_matrix = HMM_MultiplyMat4(data.test_model.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f)));
 	data.test_model.model_matrix = HMM_MultiplyMat4(data.test_model.model_matrix, HMM_Rotate(-90.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
 #endif
+	f64 end = aurora_platform_get_time();
+	printf("Model loaded in %f seconds", end - start);
 
 	data.rge.drawables[0] = data.test_model;
 	data.rge.drawable_count++;
@@ -112,7 +116,10 @@ void game_update()
 		update_render_graph(&data.rg, &data.rge);
 		rhi_end();
 
+		f32 start = aurora_platform_get_time();
 		rhi_present();
+		f32 end = aurora_platform_get_time();
+		printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
 
 		fps_camera_input(&data.camera, dt);
 		fps_camera_update(&data.camera, dt);
@@ -123,6 +130,8 @@ void game_update()
 			data.rge.camera.frustrum_planes[i] = data.camera.frustum_planes[i];
 
 		aurora_platform_update_window();
+
+		system("cls");
 	}
 }
 

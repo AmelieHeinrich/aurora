@@ -6,6 +6,7 @@
 
 #include <HandmadeMath.h>
 
+#define MULTITHREADING_ENABLED 1
 #define MAX_PRIMITIVES 128
 #define MAX_MESHLET_VERTICES 64
 #define MAX_MESHLET_INDICES 372
@@ -35,6 +36,17 @@ struct Meshlet
 typedef struct GLTFMaterial GLTFMaterial;
 struct GLTFMaterial
 {
+    char albedo_path[512];
+    char normal_path[512];
+    char mr_path[512];
+
+    b32 has_normal;
+    b32 has_metallic;
+
+    RHI_RawImage raw_color;
+    RHI_RawImage raw_normal;
+    RHI_RawImage raw_pbr;
+
     RHI_Image albedo;
     i32 albedo_bindless_index;
     RHI_Sampler albedo_sampler;

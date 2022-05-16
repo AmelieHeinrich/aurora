@@ -1,5 +1,8 @@
 #include "fxaa_pass.h"
 
+#include <core/platform_layer.h>
+#include <stdio.h>
+
 typedef struct fxaa_pass_data fxaa_pass_data;
 struct fxaa_pass_data
 {
@@ -91,6 +94,8 @@ void fxaa_pass_free(RenderGraphNode* node, RenderGraphExecute* execute)
 
 void fxaa_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
 {
+    f64 start = aurora_platform_get_time();
+
     fxaa_pass_data* data = node->private_data;
 
     RHI_CommandBuffer* cmd_buf = rhi_get_swapchain_cmd_buf();
@@ -127,6 +132,9 @@ void fxaa_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
     rhi_cmd_end_render(cmd_buf);
 
     rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
+
+    f64 end = aurora_platform_get_time();
+    printf("FXAA pass: composite + aa execution took %f ms\n", (end - start) * 1000);
 }
 
 void fxaa_pass_resize(RenderGraphNode* node, RenderGraphExecute* execute)
