@@ -369,7 +369,7 @@ void rhi_make_swapchain()
     create_info.pQueueFamilyIndices = queue_family_indices;
     create_info.preTransform = capabilities.currentTransform;
     create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR; // TODO(milo): setting to enable vsync?
+    create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR; // TODO(milo): setting to enable vsync?
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = VK_NULL_HANDLE;
     create_info.imageFormat = formats[0].format;

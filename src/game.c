@@ -8,6 +8,7 @@
 #include <gfx/geometry_pass.h>
 #include <gfx/fxaa_pass.h>
 #include <gfx/final_blit_pass.h>
+#include <audio/audio.h>
 #include <resource/mesh.h>
 
 #include <stdio.h>
@@ -27,6 +28,8 @@ struct GameData
     RenderGraphNode* fbp;
 
     RenderGraphDrawable test_model;
+
+	AudioClip debug_music;
 };
 
 internal GameData data;
@@ -95,12 +98,18 @@ void game_init()
     connect_render_graph_nodes(&data.rg, GeometryPassOutputLit, FXAAPassInputColor, data.gp, data.fxaap);
 	connect_render_graph_nodes(&data.rg, FXAAPassOutputAntiAliased, FinalBlitPassInputImage, data.fxaap, data.fbp);
 	bake_render_graph(&data.rg, &data.rge, data.fbp);
+
+	audio_init();
+	audio_clip_load_wav(&data.debug_music, "assets/music.wav");
+	audio_clip_play(&data.debug_music);
 }
 
 void game_update()
 {
     while (!platform.quit)
 	{
+		audio_update();
+
 		f32 time = aurora_platform_get_time();
 		f32 dt = time - data.last_frame;
 		data.last_frame = time;
@@ -119,7 +128,7 @@ void game_update()
 		f32 start = aurora_platform_get_time();
 		rhi_present();
 		f32 end = aurora_platform_get_time();
-		printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
+		//printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
 
 		fps_camera_input(&data.camera, dt);
 		fps_camera_update(&data.camera, dt);
@@ -150,4 +159,7 @@ void game_exit()
 	
 	aurora_platform_free_window();
 	aurora_platform_layer_free();
+
+	audio_clip_free(&data.debug_music);
+	audio_exit();
 }

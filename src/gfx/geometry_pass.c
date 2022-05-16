@@ -491,7 +491,7 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
 
     f64 end = aurora_platform_get_time();
 
-    printf("Geometry Pass: GBuffer execution took %f ms\n", (end - start) * 1000);
+    //printf("Geometry Pass: GBuffer execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
@@ -542,7 +542,7 @@ void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode*
 
     f64 end = aurora_platform_get_time();
 
-    printf("Geometry Pass: Deferred execution took %f ms\n", (end - start) * 1000);
+    //printf("Geometry Pass: Deferred execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_execute_skybox(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
@@ -591,7 +591,7 @@ void geometry_pass_execute_skybox(RHI_CommandBuffer* cmd_buf, RenderGraphNode* n
 
     f64 end = aurora_platform_get_time();
 
-    printf("Geometry Pass: Skybox execution took %f ms\n", (end - start) * 1000);
+    //printf("Geometry Pass: Skybox execution took %f ms\n", (end - start) * 1000);
 }
 
 void geometry_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
