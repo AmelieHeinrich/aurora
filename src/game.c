@@ -27,7 +27,7 @@ struct GameData
     RenderGraphNode* fxaap;
     RenderGraphNode* fbp;
 
-    RenderGraphDrawable test_model;
+    Mesh test_model;
 
 	AudioClip debug_music;
 };
@@ -75,21 +75,15 @@ void game_init()
 	f64 start = aurora_platform_get_time();
 
 #if TEST_MODEL_SPONZA
-	mesh_load(&data.test_model.m, "assets/Sponza.gltf");
-	data.test_model.model_matrix = HMM_Mat4d(1.0f);
-	data.test_model.model_matrix = HMM_Scale(HMM_Vec3(0.00800000037997961, 0.00800000037997961, 0.00800000037997961));
-	data.test_model.model_matrix = HMM_MultiplyMat4(data.test_model.model_matrix, HMM_Rotate(-180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
+	mesh_load(&data.test_model, "assets/Sponza.gltf");
 #elif TEST_MODEL_HELMET
-	mesh_load(&data.test_model.m, "assets/DamagedHelmet.gltf");
-	data.test_model.model_matrix = HMM_Mat4d(1.0f);
-	data.test_model.model_matrix = HMM_MultiplyMat4(data.test_model.model_matrix, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f)));
-	data.test_model.model_matrix = HMM_MultiplyMat4(data.test_model.model_matrix, HMM_Rotate(-90.0f, HMM_Vec3(1.0f, 0.0f, 0.0f)));
+	mesh_load(&data.test_model, "assets/DamagedHelmet.gltf");
 #endif
 	f64 end = aurora_platform_get_time();
 	printf("Model loaded in %f seconds", end - start);
 
-	data.rge.drawables[0] = data.test_model;
-	data.rge.drawable_count++;
+	data.rge.models[0] = data.test_model;
+	data.rge.model_count++;
 
     data.gp = create_geometry_pass();
 	data.fxaap = create_fxaa_pass();
@@ -101,7 +95,7 @@ void game_init()
 
 	audio_init();
 	audio_clip_load_wav(&data.debug_music, "assets/music.wav");
-	audio_clip_play(&data.debug_music);
+	//audio_clip_play(&data.debug_music);
 }
 
 void game_update()
@@ -148,7 +142,7 @@ void game_exit()
 {
     rhi_wait_idle();
 
-	mesh_free(&data.test_model.m);
+	mesh_free(&data.test_model);
 
 	free_render_graph(&data.rg, &data.rge);
 

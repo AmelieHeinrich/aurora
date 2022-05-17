@@ -159,9 +159,10 @@ void mesh_load_pbr(Thread* thread)
     rhi_load_raw_image(&mat->raw_pbr, mat->mr_path);
 }
 
-void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_index, Mesh* m)
+void cgltf_process_primitive(cgltf_primitive* cgltf_primitive, u32* primitive_index, Mesh* m, hmm_mat4 transform)
 {
     Primitive* pri = &m->primitives[(*primitive_index)++];
+    pri->transform = transform;
 
     if (cgltf_primitive->type != cgltf_primitive_type_triangles)
         return;
@@ -494,9 +495,28 @@ void cgltf_process_node(cgltf_node* node, u32* primitive_index, Mesh* m)
 {
     if (node->mesh)
     {
+        hmm_mat4 pri_transform = HMM_Mat4d(1.0f);
+
+        if (node->has_translation)
+        {
+            hmm_vec3 translation = HMM_Vec3(node->translation[0], node->translation[1], node->translation[2]);
+            pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Translate(translation));
+        }
+        if (node->has_rotation)
+        {
+            hmm_quaternion rotation = HMM_Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
+            pri_transform = HMM_MultiplyMat4(pri_transform, HMM_QuaternionToMat4(rotation));
+            pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f)));
+        }
+        if (node->has_scale)
+        {
+            hmm_vec3 scale = HMM_Vec3(node->scale[0], node->scale[1], node->scale[2]);
+            pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Scale(scale));
+        }
+
         for (i32 p = 0; p < node->mesh->primitives_count; p++)
         {
-            cgltf_process_primitive(&node->mesh->primitives[p], primitive_index, m);
+            cgltf_process_primitive(&node->mesh->primitives[p], primitive_index, m, pri_transform);
             m->primitive_count++;
         }
     }

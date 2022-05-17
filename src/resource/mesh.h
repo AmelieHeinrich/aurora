@@ -82,6 +82,8 @@ struct Primitive
     u32 triangle_count;
     u32 meshlet_count;
     u32 material_index;
+
+    hmm_mat4 transform;
 };
 
 typedef struct Mesh Mesh;

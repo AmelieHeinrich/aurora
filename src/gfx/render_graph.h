@@ -9,21 +9,14 @@
 #define DECLARE_NODE_INPUT(index) ((1u << 31u) | index)
 #define IS_NODE_INPUT(id) (((1u << 31u) & id) > 0)
 #define GET_NODE_PORT_INDEX(id) (((1u << 31u) - 1u) & id)
-#define RENDER_GRAPH_MAX_DRAWABLES 512
+#define RENDER_GRAPH_MAX_MODELS 512
 #define RENDER_GRAPH_MAX_LIGHTS 512
 
 typedef struct RenderGraphExecute RenderGraphExecute;
 typedef struct RenderGraphNode RenderGraphNode;
 typedef struct RenderGraphNode_input RenderGraphNode_input;
 typedef struct RenderGraph RenderGraph;
-typedef struct RenderGraphDrawable RenderGraphDrawable;
 typedef struct RenderGraphPointLight RenderGraphPointLight;
-
-struct RenderGraphDrawable
-{
-    Mesh m;
-    hmm_mat4 model_matrix;
-};
 
 struct RenderGraphPointLight
 {
@@ -35,8 +28,8 @@ struct RenderGraphPointLight
 
 struct RenderGraphExecute
 {
-    RenderGraphDrawable drawables[RENDER_GRAPH_MAX_DRAWABLES];
-    i32 drawable_count;
+    Mesh models[RENDER_GRAPH_MAX_MODELS];
+    i32 model_count;
 
     u32 width;
     u32 height;

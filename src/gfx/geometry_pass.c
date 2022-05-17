@@ -470,15 +470,15 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &data->params_set, 5);
     rhi_cmd_set_depth_bounds(cmd_buf, 0.0f, 0.999f);
 
-    for (i32 i = 0; i < execute->drawable_count; i++)
+    for (i32 i = 0; i < execute->model_count; i++)
     {
-        RenderGraphDrawable* drawable = &execute->drawables[i];
-        for (u32 i = 0; i < drawable->m.primitive_count; i++)
+        Mesh* model = &execute->models[i];
+        for (u32 i = 0; i < model->primitive_count; i++)
 	    {
-	    	rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &drawable->model_matrix, sizeof(hmm_mat4));
-            rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &drawable->m.materials[drawable->m.primitives[i].material_index].material_set, 3);
-            rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &drawable->m.primitives[i].geometry_descriptor_set, 4);
-	    	rhi_cmd_draw_meshlets(cmd_buf, drawable->m.primitives[i].meshlet_count);
+	    	rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].transform, sizeof(hmm_mat4));
+            rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->materials[model->primitives[i].material_index].material_set, 3);
+            rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].geometry_descriptor_set, 4);
+	    	rhi_cmd_draw_meshlets(cmd_buf, model->primitives[i].meshlet_count);
 	    }
     }
 
