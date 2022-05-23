@@ -12,8 +12,6 @@ struct geometry_pass
         hmm_vec2 pad;
     } parameters;
 
-    b32 first_render;
-
     RHI_Sampler nearest_sampler;
     RHI_Sampler linear_sampler;
     RHI_Sampler cubemap_sampler;
@@ -99,17 +97,17 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     
     rhi_upload_image(&data->hdr_cubemap, &raw_hdr, 0);
     rhi_free_raw_image(&raw_hdr);
-    rhi_allocate_cubemap(&data->cubemap, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
-    rhi_allocate_cubemap(&data->irradiance, 128, 128, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
-    rhi_allocate_cubemap(&data->prefilter, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE);
-    rhi_allocate_image(&data->brdf, 512, 512, VK_FORMAT_R16G16_SFLOAT, IMAGE_STORAGE);
+    rhi_allocate_cubemap(&data->cubemap, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE, VK_IMAGE_LAYOUT_GENERAL);
+    rhi_allocate_cubemap(&data->irradiance, 128, 128, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE, VK_IMAGE_LAYOUT_GENERAL);
+    rhi_allocate_cubemap(&data->prefilter, 512, 512, VK_FORMAT_R16G16B16A16_UNORM, IMAGE_STORAGE, VK_IMAGE_LAYOUT_GENERAL);
+    rhi_allocate_image(&data->brdf, 512, 512, VK_FORMAT_R16G16_SFLOAT, IMAGE_STORAGE, VK_IMAGE_LAYOUT_GENERAL);
 
-    rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
-    rhi_allocate_image(&data->gNormal, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER);
-    rhi_allocate_image(&data->gAlbedo, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER);
-    rhi_allocate_image(&data->gMetallicRoughness, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER);
-    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_RTV);
-    rhi_allocate_image(&node->outputs[1], execute->width, execute->height, VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    rhi_allocate_image(&data->gPosition, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    rhi_allocate_image(&data->gNormal, execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_GBUFFER, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    rhi_allocate_image(&data->gAlbedo, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    rhi_allocate_image(&data->gMetallicRoughness, execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_GBUFFER, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R16G16B16A16_SFLOAT, IMAGE_RTV, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    rhi_allocate_image(&node->outputs[1], execute->width, execute->height, VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     node->output_count = 2;
 
     RHI_CommandBuffer cmd_buf;
@@ -428,8 +426,6 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         rhi_free_shader(&vs);
         rhi_free_shader(&fs);
     }
-
-    data->first_render = 1;
 }
 
 void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* node, RenderGraphExecute* execute, geometry_pass* data)
@@ -452,14 +448,12 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     begin.images[4] = &node->outputs[1];
 	begin.image_count = 5;
 
-    u32 src_layout = data->first_render == 1 ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
     rhi_cmd_start_render(cmd_buf, begin);
 
-    rhi_cmd_img_transition_layout(cmd_buf, &data->gPosition, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-    rhi_cmd_img_transition_layout(cmd_buf, &data->gNormal, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-    rhi_cmd_img_transition_layout(cmd_buf, &data->gAlbedo, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-    rhi_cmd_img_transition_layout(cmd_buf, &data->gMetallicRoughness, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &data->gPosition, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &data->gNormal, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &data->gAlbedo, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &data->gMetallicRoughness, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
     rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[1], 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, 0);
 
     rhi_cmd_set_viewport(cmd_buf, execute->width, execute->height);
@@ -510,10 +504,7 @@ void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode*
 	begin.images[0] = &node->outputs[0];
 	begin.image_count = 1;
 
-    u32 src_layout = data->first_render == 1 ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    data->first_render = 0;
-
-    rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
     hmm_vec4 temp = HMM_Vec4(execute->camera.pos.X, execute->camera.pos.Y, execute->camera.pos.Z, 1.0);
 
     for (u32 i = 0; i < 6; i++)
@@ -629,7 +620,6 @@ void geometry_pass_resize(RenderGraphNode* node, RenderGraphExecute* execute)
     rhi_descriptor_set_write_image(&data->deferred_set, &data->gNormal, 1);
     rhi_descriptor_set_write_image(&data->deferred_set, &data->gAlbedo, 2);
     rhi_descriptor_set_write_image(&data->deferred_set, &data->gMetallicRoughness, 3);
-    data->first_render = 1;
 }
 
 void geometry_pass_free(RenderGraphNode* node, RenderGraphExecute* execute)

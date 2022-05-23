@@ -1222,18 +1222,18 @@ void rhi_free_buffer(RHI_Buffer* buffer)
 
 void rhi_upload_buffer(RHI_Buffer* buffer, void* data, u64 size)
 {
-    void* buf;
+    void* buf = NULL;
     vk_check(vmaMapMemory(state.allocator, buffer->allocation, &buf));
     memcpy(buf, data, size);
     vmaUnmapMemory(state.allocator, buffer->allocation);
 }
 
-void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage)
+void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage, u32 target_layout)
 {
     image->width = width;
     image->height = height;
     image->format = format;
-    image->image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->image_layout = target_layout;
     image->usage = usage;
     image->extent.width = width;
     image->extent.height = height;
@@ -1277,14 +1277,21 @@ void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format
 
     res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
     vk_check(res);
+
+    RHI_CommandBuffer temp;
+    rhi_init_upload_cmd_buf(&temp);
+    rhi_begin_cmd_buf(&temp);
+    rhi_cmd_img_transition_layout(&temp, image, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, target_layout, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0);
+    rhi_end_cmd_buf(&temp);
+    rhi_submit_upload_cmd_buf(&temp);
 }
 
-void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage)
+void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage, u32 target_layout)
 {
     image->width = width;
     image->height = height;
     image->format = format;
-    image->image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->image_layout = target_layout;
     image->usage = usage;
     image->extent.width = width;
     image->extent.height = height;
@@ -1329,6 +1336,13 @@ void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat form
 
     res = vkCreateImageView(state.device, &view_info, NULL, &image->image_view);
     vk_check(res);
+
+    RHI_CommandBuffer temp;
+    rhi_init_upload_cmd_buf(&temp);
+    rhi_begin_cmd_buf(&temp);
+    rhi_cmd_img_transition_layout(&temp, image, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, target_layout, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0);
+    rhi_end_cmd_buf(&temp);
+    rhi_submit_upload_cmd_buf(&temp);
 }
 
 void rhi_generate_mipmaps(RHI_Image* image)
@@ -1413,7 +1427,7 @@ void rhi_load_raw_image(RHI_RawImage* image, const char* path)
 {
     u32 channels;
     image->data = stbi_load(path, &image->width, &image->height, &channels, STBI_rgb_alpha);
-    assert(image->data);
+    //assert(image->data);
     image->data_size = image->width * image->height * 4;
     image->format = VK_FORMAT_R8G8B8A8_UNORM;
 }
@@ -1538,7 +1552,7 @@ void rhi_resize_image(RHI_Image* image, i32 width, i32 height)
         image->width = width;
         image->height = height;
         rhi_free_image(image);
-        rhi_allocate_image(image, image->width, image->height, image->format, image->usage);
+        rhi_allocate_image(image, image->width, image->height, image->format, image->usage, image->image_layout);
     }
 }
 

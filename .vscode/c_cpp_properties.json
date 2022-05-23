@@ -9,7 +9,7 @@
                 "third_party"
             ],
             "defines": [
-                "_DEBUG",
+                //"_DEBUG",
                 "UNICODE",
                 "_UNICODE",
                 "VK_NO_PROTOTYPES",

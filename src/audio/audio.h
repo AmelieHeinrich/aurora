@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/common.h>
+#include <core/platform_layer.h>
 
 #include <miniaudio.h>
 #include <dr_wav.h>
@@ -21,6 +22,7 @@ struct AudioClip
 void audio_init();
 void audio_exit();
 void audio_update();
+void audio_async_update(Thread* thread);
 
 void audio_clip_load_wav(AudioClip* clip, const char* path);
 void audio_clip_free(AudioClip* clip);

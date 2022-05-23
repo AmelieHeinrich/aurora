@@ -506,13 +506,14 @@ void cgltf_process_node(cgltf_node* node, u32* primitive_index, Mesh* m)
         {
             hmm_quaternion rotation = HMM_Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
             pri_transform = HMM_MultiplyMat4(pri_transform, HMM_QuaternionToMat4(rotation));
-            pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f)));
         }
         if (node->has_scale)
         {
             hmm_vec3 scale = HMM_Vec3(node->scale[0], node->scale[1], node->scale[2]);
             pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Scale(scale));
         }
+
+        pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f))); // Flip y-axis
 
         for (i32 p = 0; p < node->mesh->primitives_count; p++)
         {

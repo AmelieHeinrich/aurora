@@ -197,7 +197,6 @@ DWORD WINAPI _thread_worker(LPVOID lparam)
 
 	thread->working = 1;
 	thread->worker(thread);
-	thread->working = 0;
 
 	return 0;
 }
@@ -222,6 +221,7 @@ void aurora_platform_execute_thread(Thread* thread)
 
 void aurora_platform_join_thread(Thread* thread)
 {
+	thread->working = 0;
 	if (!thread->handle) return;
 
 	WaitForSingleObject(thread->handle, INFINITE);

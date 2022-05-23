@@ -8,7 +8,6 @@ struct fxaa_pass_data
 {
     RHI_Pipeline fxaa_pipeline;
     RHI_Buffer screen_vertex_buffer;
-    b32 first_render;
 
     struct {
         hmm_vec2 screen_size;
@@ -22,9 +21,8 @@ struct fxaa_pass_data
 void fxaa_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
 {
     fxaa_pass_data* data = node->private_data;
-    data->first_render = 1;
 
-    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_RTV);
+    rhi_allocate_image(&node->outputs[0], execute->width, execute->height, VK_FORMAT_R8G8B8A8_UNORM, IMAGE_RTV, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     node->output_count = 1;
 
     {
@@ -105,9 +103,6 @@ void fxaa_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
     data->push_constants.pad.X = execute->width;
     data->push_constants.pad.Y = execute->height;
 
-    u32 src_layout = data->first_render ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    data->first_render = 0;
-
     RHI_RenderBegin begin = {0};
 	begin.r = 0.0f;
 	begin.g = 0.0f;
@@ -119,7 +114,7 @@ void fxaa_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
 	begin.images[0] = &node->outputs[0];
 	begin.image_count = 1;
     
-    rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, src_layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+    rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
     
     rhi_cmd_start_render(cmd_buf, begin);
     rhi_cmd_set_viewport(cmd_buf, execute->width, execute->height);
@@ -143,7 +138,6 @@ void fxaa_pass_resize(RenderGraphNode* node, RenderGraphExecute* execute)
 
     rhi_descriptor_set_write_image(&data->fxaa_set, get_render_graph_node_input_image(&node->inputs[0]), 0);
     rhi_resize_image(&node->outputs[0], execute->width, execute->height);
-    data->first_render = 1;
 }
 
 RenderGraphNode* create_fxaa_pass()

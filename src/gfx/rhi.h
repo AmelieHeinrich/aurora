@@ -227,8 +227,8 @@ void rhi_load_raw_hdr_image(RHI_RawImage* image, const char* path);
 void rhi_free_raw_image(RHI_RawImage* image);
 
 // Image
-void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage);
-void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage);
+void rhi_allocate_image(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage, u32 target_layout);
+void rhi_allocate_cubemap(RHI_Image* image, i32 width, i32 height, VkFormat format, u32 usage, u32 target_layout);
 void rhi_upload_image(RHI_Image* image, RHI_RawImage* raw_image, b32 gen_mips);
 void rhi_free_image(RHI_Image* image);
 void rhi_resize_image(RHI_Image* image, i32 width, i32 height);

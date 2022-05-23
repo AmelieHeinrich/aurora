@@ -5,7 +5,7 @@ if not exist build (
     mkdir build
 )
 
-set debug=true
+set debug=false
 
 if %debug%==true (
     echo Compiling in debug mode.
@@ -18,7 +18,7 @@ if %debug%==true (
     echo Compiling in release mode.
     echo.
 
-    set debugFlags=-DNDEBUG -O2 -Oi -fp:fast
+    set debugFlags=-Oi -fp:fast
     set entryPoint = /link /subsystem:WINDOWS
     set link_path=/link /LIBPATH:%rootDir%/bin/dbg
 )

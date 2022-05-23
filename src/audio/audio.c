@@ -72,6 +72,23 @@ void audio_update()
 	}
 }
 
+void audio_async_update(Thread* thread)
+{
+	while (aurora_platform_active_thread(thread))
+	{
+		for (u32 i = 0; i < ctx.clip_count; i++) {
+			AudioClip* clip = ctx.clips[i];
+	
+			if (!clip->playing) {
+				audio_clip_stop(clip);
+				if (clip->loop) {
+					audio_clip_play(clip);
+				}
+			}
+		}
+	}
+}
+
 void audio_clip_load_wav(AudioClip* clip, const char* path)
 {
     drwav_init_file(&clip->wav, path, NULL);
