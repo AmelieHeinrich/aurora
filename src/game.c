@@ -93,18 +93,10 @@ void game_init()
     connect_render_graph_nodes(&data.rg, GeometryPassOutputLit, FXAAPassInputColor, data.gp, data.fxaap);
 	connect_render_graph_nodes(&data.rg, FXAAPassOutputAntiAliased, FinalBlitPassInputImage, data.fxaap, data.fbp);
 	bake_render_graph(&data.rg, &data.rge, data.fbp);
-
-	data.audio_thread = aurora_platform_new_thread(audio_async_update);
-
-	audio_init();
-	audio_clip_load_wav(&data.debug_music, "assets/music.wav");
-	audio_clip_play(&data.debug_music);
 }
 
 void game_update()
 {
-	aurora_platform_execute_thread(data.audio_thread);
-
     while (!platform.quit)
 	{
 		f32 time = aurora_platform_get_time();
@@ -159,7 +151,4 @@ void game_exit()
 	
 	aurora_platform_free_window();
 	aurora_platform_layer_free();
-
-	audio_clip_free(&data.debug_music);
-	audio_exit();
 }

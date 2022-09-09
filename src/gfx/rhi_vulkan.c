@@ -163,8 +163,8 @@ void rhi_make_instance()
     create_info.pApplicationInfo = &app_info;
     create_info.enabledExtensionCount = state.extension_count;
     create_info.ppEnabledExtensionNames = (const char *const *)state.extensions;
-    create_info.enabledLayerCount = state.layer_count;
-    create_info.ppEnabledLayerNames = (const char* const*)state.layers;
+    create_info.enabledLayerCount = 0;
+    create_info.ppEnabledLayerNames = NULL;
 
     result = vkCreateInstance(&create_info, NULL, &state.instance);
     vk_check(result);
@@ -1814,14 +1814,14 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
     render_area.offset.x = 0;
     render_area.offset.y = 0;
 
-    VkRenderingInfoKHR rendering_info = { 0 };
-    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    VkRenderingInfo rendering_info = { 0 };
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     rendering_info.renderArea = render_area;
     rendering_info.colorAttachmentCount = color_iterator;
     rendering_info.layerCount = 1;
 
     // Max attachment count is 64
-    VkRenderingAttachmentInfoKHR color_attachments[64] = { 0 };
+    VkRenderingAttachmentInfo color_attachments[64] = { 0 };
 
     for (u32 i = 0; i < color_iterator; i++)
     {
@@ -1833,8 +1833,8 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
         clear_value.color.float32[2] = info.b;
         clear_value.color.float32[3] = info.a;
 
-        VkRenderingAttachmentInfoKHR color_attachment_info = { 0 };
-        color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        VkRenderingAttachmentInfo color_attachment_info = { 0 };
+        color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         color_attachment_info.imageView = image->image_view;
         color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
@@ -1853,8 +1853,8 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
         depth_clear_value.depthStencil.depth = info.read_depth == 1 ? 0.0F : 1.0f;
         depth_clear_value.depthStencil.stencil = 0.0f;
 
-        VkRenderingAttachmentInfoKHR depth_attachment = { 0 };
-        depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        VkRenderingAttachmentInfo depth_attachment = { 0 };
+        depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depth_attachment.imageView = image->image_view;
         depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         depth_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
@@ -1868,12 +1868,12 @@ void rhi_cmd_start_render(RHI_CommandBuffer* buf, RHI_RenderBegin info)
 
     rendering_info.pColorAttachments = color_attachments;
 
-    vkCmdBeginRenderingKHR(buf->buf, &rendering_info);
+    vkCmdBeginRendering(buf->buf, &rendering_info);
 }
 
 void rhi_cmd_end_render(RHI_CommandBuffer* buf)
 {
-    vkCmdEndRenderingKHR(buf->buf);
+    vkCmdEndRendering(buf->buf);
 }
 
 void rhi_cmd_img_transition_layout(RHI_CommandBuffer* buf, RHI_Image* img, u32 src_access, u32 dst_access, u32 src_layout, u32 dst_layout, u32 src_p_stage, u32 dst_p_stage, u32 layer)
