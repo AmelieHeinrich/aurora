@@ -67,11 +67,11 @@ void fxaa_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     }
 
     f32 quad_vertices[] = {
-		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-	};
+	 -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+	 -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+	  1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+          1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
 
     rhi_allocate_buffer(&data->screen_vertex_buffer, sizeof(quad_vertices), BUFFER_VERTEX);
     rhi_upload_buffer(&data->screen_vertex_buffer, quad_vertices, sizeof(quad_vertices));
@@ -104,15 +104,15 @@ void fxaa_pass_update(RenderGraphNode* node, RenderGraphExecute* execute)
     data->push_constants.pad.Y = execute->height;
 
     RHI_RenderBegin begin = {0};
-	begin.r = 0.0f;
-	begin.g = 0.0f;
-	begin.b = 0.0f;
-	begin.a = 1.0f;
-	begin.has_depth = 0;
-	begin.width = execute->width;
-	begin.height = execute->height;
-	begin.images[0] = &node->outputs[0];
-	begin.image_count = 1;
+    begin.r = 0.0f;
+    begin.g = 0.0f;
+    begin.b = 0.0f;
+    begin.a = 1.0f;
+    begin.has_depth = 0;
+    begin.width = execute->width;
+    begin.height = execute->height;
+    begin.images[0] = &node->outputs[0];
+    begin.image_count = 1;
     
     rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
     

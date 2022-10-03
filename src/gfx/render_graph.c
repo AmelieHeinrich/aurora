@@ -27,10 +27,10 @@ void init_render_graph(RenderGraph* graph, RenderGraphExecute* execute)
     graph->node_count = 0;
 
     rhi_init_descriptor_heap(&execute->image_heap, DESCRIPTOR_HEAP_IMAGE, 512);
-	rhi_init_descriptor_heap(&execute->sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 512);
-	mesh_loader_set_texture_heap(&execute->image_heap);
+    rhi_init_descriptor_heap(&execute->sampler_heap, DESCRIPTOR_HEAP_SAMPLER, 512);
+    mesh_loader_set_texture_heap(&execute->image_heap);
     mesh_loader_set_sampler_heap(&execute->sampler_heap);
-	mesh_loader_init(4);
+    mesh_loader_init(4);
 
     execute->camera_descriptor_set_layout.descriptor_count = 1;
     execute->camera_descriptor_set_layout.descriptors[0] = DESCRIPTOR_BUFFER;

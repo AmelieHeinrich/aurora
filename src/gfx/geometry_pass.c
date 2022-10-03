@@ -67,11 +67,11 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     data->parameters.shade_meshlets = 0;
     
     f32 quad_vertices[] = {
-		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-	};
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+	-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+	 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
 
     rhi_allocate_buffer(&data->screen_vertex_buffer, sizeof(quad_vertices), BUFFER_VERTEX);
     rhi_upload_buffer(&data->screen_vertex_buffer, quad_vertices, sizeof(quad_vertices));
@@ -79,14 +79,14 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     rhi_allocate_buffer(&data->render_params_buffer, sizeof(data->parameters), BUFFER_UNIFORM);
 
     data->nearest_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	data->nearest_sampler.filter = VK_FILTER_NEAREST;
-	rhi_init_sampler(&data->nearest_sampler, 1);
-	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->nearest_sampler, 0);
+    data->nearest_sampler.filter = VK_FILTER_NEAREST;
+    rhi_init_sampler(&data->nearest_sampler, 1);
+    rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->nearest_sampler, 0);
 
     data->linear_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	data->linear_sampler.filter = VK_FILTER_LINEAR;
-	rhi_init_sampler(&data->linear_sampler, 1);
-	rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->linear_sampler, 1);
+    data->linear_sampler.filter = VK_FILTER_LINEAR;
+    rhi_init_sampler(&data->linear_sampler, 1);
+    rhi_push_descriptor_heap_sampler(&execute->sampler_heap, &data->linear_sampler, 1);
 
     data->cubemap_sampler.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     data->cubemap_sampler.filter = VK_FILTER_LINEAR;
@@ -246,17 +246,17 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
             rhi_cmd_set_descriptor_set(&cmd_buf, &data->prefilter_pipeline, &data->prefilter_set, 0);
 
             for (u32 i = 0; i < 5; i++)
-	        {
-	        	u32 mip_width = (u32)(512.0f * pow(0.5f, i));
-	        	u32 mip_height = (u32)(512.0f * pow(0.5f, i));
-	        	f32 roughness = (f32)i / (f32)(5 - 1);
+	    {
+	        u32 mip_width = (u32)(512.0f * pow(0.5f, i));
+	        u32 mip_height = (u32)(512.0f * pow(0.5f, i));
+	        f32 roughness = (f32)i / (f32)(5 - 1);
 
-	        	hmm_vec4 vec;
+	        hmm_vec4 vec;
                 vec.X = roughness;
 
-	        	rhi_cmd_set_push_constants(&cmd_buf, &data->prefilter_pipeline, &vec, sizeof(hmm_vec4));
-	        	rhi_cmd_dispatch(&cmd_buf, mip_width / 32, mip_height / 32, 6);
-	        }
+	        rhi_cmd_set_push_constants(&cmd_buf, &data->prefilter_pipeline, &vec, sizeof(hmm_vec4));
+	        rhi_cmd_dispatch(&cmd_buf, mip_width / 32, mip_height / 32, 6);
+	    }
         }
 
         // brdf
@@ -435,18 +435,18 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
     begin.r = 0.0f;
-	begin.g = 0.0f;
-	begin.b = 0.0f;
-	begin.a = 1.0f;
-	begin.has_depth = 1;
-	begin.width = execute->width;
-	begin.height = execute->height;
-	begin.images[0] = &data->gPosition;
-	begin.images[1] = &data->gNormal;
+    begin.g = 0.0f;
+    begin.b = 0.0f;
+    begin.a = 1.0f;
+    begin.has_depth = 1;
+    begin.width = execute->width;
+    begin.height = execute->height;
+    begin.images[0] = &data->gPosition;
+    begin.images[1] = &data->gNormal;
     begin.images[2] = &data->gAlbedo;
-	begin.images[3] = &data->gMetallicRoughness;
+    begin.images[3] = &data->gMetallicRoughness;
     begin.images[4] = &node->outputs[1];
-	begin.image_count = 5;
+    begin.image_count = 5;
 
     rhi_cmd_start_render(cmd_buf, begin);
 
@@ -468,12 +468,12 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     {
         Mesh* model = &execute->models[i];
         for (u32 i = 0; i < model->primitive_count; i++)
-	    {
-	    	rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].transform, sizeof(hmm_mat4));
+	{
+	    rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].transform, sizeof(hmm_mat4));
             rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->materials[model->primitives[i].material_index].material_set, 3);
             rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].geometry_descriptor_set, 4);
-	    	rhi_cmd_draw_meshlets(cmd_buf, model->primitives[i].meshlet_count);
-	    }
+	    rhi_cmd_draw_meshlets(cmd_buf, model->primitives[i].meshlet_count);
+	}
     }
 
     rhi_cmd_img_transition_layout(cmd_buf, &data->gPosition, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);
@@ -494,15 +494,15 @@ void geometry_pass_execute_deferred(RHI_CommandBuffer* cmd_buf, RenderGraphNode*
 
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
-	begin.r = 0.0f;
-	begin.g = 0.0f;
-	begin.b = 0.0f;
-	begin.a = 1.0f;
-	begin.has_depth = 0;
-	begin.width = execute->width;
-	begin.height = execute->height;
-	begin.images[0] = &node->outputs[0];
-	begin.image_count = 1;
+    begin.r = 0.0f;
+    begin.g = 0.0f;
+    begin.b = 0.0f;
+    begin.a = 1.0f;
+    begin.has_depth = 0;
+    begin.width = execute->width;
+    begin.height = execute->height;
+    begin.images[0] = &node->outputs[0];
+    begin.image_count = 1;
 
     rhi_cmd_img_transition_layout(cmd_buf, &node->outputs[0], VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
     hmm_vec4 temp = HMM_Vec4(execute->camera.pos.X, execute->camera.pos.Y, execute->camera.pos.Z, 1.0);
@@ -543,15 +543,15 @@ void geometry_pass_execute_skybox(RHI_CommandBuffer* cmd_buf, RenderGraphNode* n
     RHI_RenderBegin begin;
     memset(&begin, 0, sizeof(RHI_RenderBegin));
     begin.r = 0.0f;
-	begin.g = 0.0f;
-	begin.b = 0.0f;
-	begin.a = 1.0f;
-	begin.has_depth = 1;
-	begin.width = execute->width;
-	begin.height = execute->height;
-	begin.images[0] = &node->outputs[0];
+    begin.g = 0.0f;
+    begin.b = 0.0f;
+    begin.a = 1.0f;
+    begin.has_depth = 1;
+    begin.width = execute->width;
+    begin.height = execute->height;
+    begin.images[0] = &node->outputs[0];
     begin.images[1] = &node->outputs[1];
-	begin.image_count = 2;
+    begin.image_count = 2;
     begin.read_depth = 1;
     begin.read_color = 1;
 

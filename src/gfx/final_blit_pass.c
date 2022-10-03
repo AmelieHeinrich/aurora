@@ -33,7 +33,7 @@ RenderGraphNode* create_final_blit_pass()
     node->resize = final_blit_pass_resize;
     node->update = final_blit_pass_update;
     node->input_count = 0;
-	memset(node->inputs, 0, sizeof(node->inputs));
+    memset(node->inputs, 0, sizeof(node->inputs));
 
     return node;
 }
