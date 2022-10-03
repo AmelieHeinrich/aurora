@@ -10,10 +10,10 @@ AuroraPlatformLayer platform;
 typedef struct Win32_Aurora Win32_Aurora;
 struct Win32_Aurora
 {
-	HMODULE application_hmodule;
-	HWND hwnd;
-	f64 timer_start;
-	f64 timer_frequency;
+    HMODULE application_hmodule;
+    HWND hwnd;
+    f64 timer_start;
+    f64 timer_frequency;
 };
 
 internal Win32_Aurora windows;
