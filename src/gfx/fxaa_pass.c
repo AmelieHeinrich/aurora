@@ -67,9 +67,9 @@ void fxaa_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     }
 
     f32 quad_vertices[] = {
-	 -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-	 -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-	  1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+     -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+     -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+      1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
           1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
     };
 

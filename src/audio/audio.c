@@ -28,11 +28,11 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     /* Assuming format is always s16 for now. */
     for (i32 i = 0; i < ctx.clip_count; i++) {
         if (pDevice->playback.format == ma_format_s16) {
-       	    drwav_read_pcm_frames_s16(&ctx.clips[i]->wav, frameCount, (drwav_int16*)pOutput);
+               drwav_read_pcm_frames_s16(&ctx.clips[i]->wav, frameCount, (drwav_int16*)pOutput);
     } else if (pDevice->playback.format == ma_format_f32) {
         drwav_read_pcm_frames_f32(&ctx.clips[i]->wav, frameCount, (float*)pOutput);
     } else {
-    	    /* Unsupported format. */
+            /* Unsupported format. */
         }
     }
 
@@ -63,11 +63,11 @@ void audio_update()
     for (u32 i = 0; i < ctx.clip_count; i++) {
         AudioClip* clip = ctx.clips[i];
 
-	if (!clip->playing) {
-	     audio_clip_stop(clip);
-	     if (clip->loop) {
-	         audio_clip_play(clip);
-	     }
+    if (!clip->playing) {
+         audio_clip_stop(clip);
+         if (clip->loop) {
+             audio_clip_play(clip);
+         }
         }
     }
 }
@@ -77,15 +77,15 @@ void audio_async_update(Thread* thread)
     while (aurora_platform_active_thread(thread))
     {
         for (u32 i = 0; i < ctx.clip_count; i++) {
-	    AudioClip* clip = ctx.clips[i];
-	
-	    if (!clip->playing) {
-	        audio_clip_stop(clip);
-		if (clip->loop) {
-		    audio_clip_play(clip);
-		}
-	    }
-	}
+        AudioClip* clip = ctx.clips[i];
+    
+        if (!clip->playing) {
+            audio_clip_stop(clip);
+        if (clip->loop) {
+            audio_clip_play(clip);
+        }
+        }
+    }
     }
 }
 
@@ -109,9 +109,9 @@ void audio_clip_play(AudioClip* clip)
 {
     for (u32 i = 0; i < ctx.clip_count; i++) {
         if (ctx.clips[i] == clip) {
-	    audio_clip_stop(ctx.clips[i]);
-	    break;
-	}
+        audio_clip_stop(ctx.clips[i]);
+        break;
+    }
     }
 
     ma_decoder_seek_to_pcm_frame(&clip->decoder, 0);

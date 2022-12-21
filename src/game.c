@@ -63,13 +63,13 @@ void game_init()
 
     for (i32 i = 0; i < TEST_LIGHT_COUNT; i++)
     {
-	 data.rge.light_info.lights[i].position.X = random_float(-3.0f, 3.0f);
-	 data.rge.light_info.lights[i].position.Y = random_float(-1.0f, -5.0f);
-	 data.rge.light_info.lights[i].position.Z = random_float(-3.0f, 3.0f);
+     data.rge.light_info.lights[i].position.X = random_float(-3.0f, 3.0f);
+     data.rge.light_info.lights[i].position.Y = random_float(-1.0f, -5.0f);
+     data.rge.light_info.lights[i].position.Z = random_float(-3.0f, 3.0f);
 
-	 data.rge.light_info.lights[i].color.X = random_float(0.1f, 4.0f);
-	 data.rge.light_info.lights[i].color.Y = random_float(0.1f, 4.0f);
-	 data.rge.light_info.lights[i].color.Z = random_float(0.1f, 4.0f);
+     data.rge.light_info.lights[i].color.X = random_float(0.1f, 4.0f);
+     data.rge.light_info.lights[i].color.Y = random_float(0.1f, 4.0f);
+     data.rge.light_info.lights[i].color.Z = random_float(0.1f, 4.0f);
     }
     data.rge.light_info.light_count = TEST_LIGHT_COUNT;
 
@@ -100,36 +100,36 @@ void game_update()
     while (!platform.quit)
     {
         f32 time = aurora_platform_get_time();
-	f32 dt = time - data.last_frame;
-	data.last_frame = time;
+    f32 dt = time - data.last_frame;
+    data.last_frame = time;
 
-	data.rge.camera.projection = data.camera.projection;
-	data.rge.camera.view = data.camera.view;
+    data.rge.camera.projection = data.camera.projection;
+    data.rge.camera.view = data.camera.view;
         data.rge.camera.pos = data.camera.position;
 
-	if (aurora_platform_key_pressed(KEY_W))
-	    data.update_frustum = 0;
+    if (aurora_platform_key_pressed(KEY_W))
+        data.update_frustum = 0;
 
-	rhi_begin();
-	update_render_graph(&data.rg, &data.rge);
-	rhi_end();
+    rhi_begin();
+    update_render_graph(&data.rg, &data.rge);
+    rhi_end();
 
-	f32 start = aurora_platform_get_time();
-	rhi_present();
-	f32 end = aurora_platform_get_time();
-	//printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
+    f32 start = aurora_platform_get_time();
+    rhi_present();
+    f32 end = aurora_platform_get_time();
+    //printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
 
-	fps_camera_input(&data.camera, dt);
-	fps_camera_update(&data.camera, dt);
-	if (data.update_frustum)
-	    fps_camera_update_frustum(&data.camera);
+    fps_camera_input(&data.camera, dt);
+    fps_camera_update(&data.camera, dt);
+    if (data.update_frustum)
+        fps_camera_update_frustum(&data.camera);
 
-	for (i32 i = 0; i < 6; i++)
-	    data.rge.camera.frustrum_planes[i] = data.camera.frustum_planes[i];
+    for (i32 i = 0; i < 6; i++)
+        data.rge.camera.frustrum_planes[i] = data.camera.frustum_planes[i];
 
         aurora_platform_update_window();
 
-	system("cls");
+    system("cls");
    }
 }
 
@@ -148,7 +148,7 @@ void game_exit()
     rhi_free_descriptor_heap(&data.rge.image_heap);
     rhi_free_descriptor_heap(&data.rge.sampler_heap);
     rhi_shutdown();
-	
+    
     aurora_platform_free_window();
     aurora_platform_layer_free();
 }

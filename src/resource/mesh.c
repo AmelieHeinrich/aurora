@@ -513,7 +513,7 @@ void cgltf_process_node(cgltf_node* node, u32* primitive_index, Mesh* m)
             pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Scale(scale));
         }
 
-        pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Rotate(180.0f, HMM_Vec3(0.0f, 1.0f, 0.0f))); // Flip y-axis
+        pri_transform = HMM_MultiplyMat4(pri_transform, HMM_Rotate(180.0f, HMM_Vec3(1.0f, 0.0f, 0.0f))); // Flip y-axis
 
         for (i32 p = 0; p < node->mesh->primitives_count; p++)
         {

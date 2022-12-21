@@ -32,10 +32,10 @@ vec3 GetNormalFromMap()
 {
     vec3 tangentNormal = texture(sampler2D(TextureHeap[BindlessIndex.y], SamplerHeap[0]), FragmentIn.fTexcoords).xyz * 2.0 - 1.0;
 
-    vec3 Q1  = dFdx(FragmentIn.fPosition);
-    vec3 Q2  = dFdy(FragmentIn.fPosition);
-    vec2 st1 = dFdx(FragmentIn.fTexcoords);
-    vec2 st2 = dFdy(FragmentIn.fTexcoords);
+    vec3 Q1  = normalize(dFdx(FragmentIn.fPosition));
+    vec3 Q2  = normalize(dFdy(FragmentIn.fPosition));
+    vec2 st1 = normalize(dFdx(FragmentIn.fTexcoords));
+    vec2 st2 = normalize(dFdy(FragmentIn.fTexcoords));
 
     vec3 N   = normalize(FragmentIn.fNormals);
     vec3 T  = normalize(Q1*st2.t - Q2*st1.t);

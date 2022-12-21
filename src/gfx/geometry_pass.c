@@ -68,8 +68,8 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
     
     f32 quad_vertices[] = {
         -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-	-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-	 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+    -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+     1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
          1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
     };
 
@@ -246,17 +246,17 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
             rhi_cmd_set_descriptor_set(&cmd_buf, &data->prefilter_pipeline, &data->prefilter_set, 0);
 
             for (u32 i = 0; i < 5; i++)
-	    {
-	        u32 mip_width = (u32)(512.0f * pow(0.5f, i));
-	        u32 mip_height = (u32)(512.0f * pow(0.5f, i));
-	        f32 roughness = (f32)i / (f32)(5 - 1);
+        {
+            u32 mip_width = (u32)(512.0f * pow(0.5f, i));
+            u32 mip_height = (u32)(512.0f * pow(0.5f, i));
+            f32 roughness = (f32)i / (f32)(5 - 1);
 
-	        hmm_vec4 vec;
+            hmm_vec4 vec;
                 vec.X = roughness;
 
-	        rhi_cmd_set_push_constants(&cmd_buf, &data->prefilter_pipeline, &vec, sizeof(hmm_vec4));
-	        rhi_cmd_dispatch(&cmd_buf, mip_width / 32, mip_height / 32, 6);
-	    }
+            rhi_cmd_set_push_constants(&cmd_buf, &data->prefilter_pipeline, &vec, sizeof(hmm_vec4));
+            rhi_cmd_dispatch(&cmd_buf, mip_width / 32, mip_height / 32, 6);
+        }
         }
 
         // brdf
@@ -398,7 +398,7 @@ void geometry_pass_init(RenderGraphNode* node, RenderGraphExecute* execute)
         RHI_ShaderModule fs;
 
         rhi_load_shader(&vs, "shaders/deferred.vert.spv");
-		rhi_load_shader(&fs, "shaders/deferred.frag.spv");
+        rhi_load_shader(&fs, "shaders/deferred.frag.spv");
 
         RHI_PipelineDescriptor descriptor;
         descriptor.use_mesh_shaders = 0;
@@ -468,12 +468,12 @@ void geometry_pass_execute_gbuffer(RHI_CommandBuffer* cmd_buf, RenderGraphNode* 
     {
         Mesh* model = &execute->models[i];
         for (u32 i = 0; i < model->primitive_count; i++)
-	{
-	    rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].transform, sizeof(hmm_mat4));
+    {
+        rhi_cmd_set_push_constants(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].transform, sizeof(hmm_mat4));
             rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->materials[model->primitives[i].material_index].material_set, 3);
             rhi_cmd_set_descriptor_set(cmd_buf, &data->gbuffer_pipeline, &model->primitives[i].geometry_descriptor_set, 4);
-	    rhi_cmd_draw_meshlets(cmd_buf, model->primitives[i].meshlet_count);
-	}
+        rhi_cmd_draw_meshlets(cmd_buf, model->primitives[i].meshlet_count);
+    }
     }
 
     rhi_cmd_img_transition_layout(cmd_buf, &data->gPosition, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0);

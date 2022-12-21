@@ -16,13 +16,13 @@ typedef void (*AuroraThreadWorker)(Thread*);
 typedef struct AuroraPlatformLayer AuroraPlatformLayer;
 struct AuroraPlatformLayer
 {	
-	u32 width;
-	u32 height;
-	b32 quit;
-	
-	char executable_directory[512];
+    u32 width;
+    u32 height;
+    b32 quit;
+    
+    char executable_directory[512];
 
-	AuroraResizeEvent resize_event;
+    AuroraResizeEvent resize_event;
 };
 
 extern AuroraPlatformLayer platform;
