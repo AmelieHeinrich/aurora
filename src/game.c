@@ -117,7 +117,6 @@ void game_update()
     f32 start = aurora_platform_get_time();
     rhi_present();
     f32 end = aurora_platform_get_time();
-    //printf("vkQueuePresentKHR took %f ms", (end - start) * 1000);
 
     fps_camera_input(&data.camera, dt);
     fps_camera_update(&data.camera, dt);
@@ -128,8 +127,6 @@ void game_update()
         data.rge.camera.frustrum_planes[i] = data.camera.frustum_planes[i];
 
         aurora_platform_update_window();
-
-    system("cls");
    }
 }
 
